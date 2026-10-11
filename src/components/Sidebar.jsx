@@ -1,47 +1,41 @@
 import { NavLink } from "react-router-dom";
-import { LayoutGrid, CalendarCheck, FolderKanban } from "lucide-react";
+import { LayoutGrid, CalendarCheck, Database } from "lucide-react";
 
 const linkBase =
-  "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors";
+  "flex items-center justify-center w-11 h-11 rounded-xl transition-colors";
 
 export default function Sidebar() {
   return (
-    <aside className="w-60 shrink-0 bg-ink-900 text-white flex flex-col h-screen sticky top-0">
-      <div className="px-5 py-6">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-brand-500 flex items-center justify-center font-bold text-white">
-            P
-          </div>
-          <div>
-            <div className="font-semibold leading-tight">Painel de Projetos</div>
-            <div className="text-xs text-white/50 leading-tight">Consultoria</div>
-          </div>
-        </div>
+    <aside className="w-16 shrink-0 bg-ink-900 text-white flex flex-col items-center h-screen sticky top-0 py-4">
+      <div
+        className="w-9 h-9 rounded-lg bg-brand-500 flex items-center justify-center font-bold text-white mb-6"
+        title="Painel de Projetos — Consultoria"
+      >
+        P
       </div>
-      <nav className="flex-1 px-3 space-y-1">
+      <nav className="flex-1 flex flex-col items-center gap-2">
         <NavLink
           to="/"
           end
+          title="Dashboard"
           className={({ isActive }) =>
-            `${linkBase} ${isActive ? "bg-white/10 text-white" : "text-white/70 hover:bg-white/5 hover:text-white"}`
+            `${linkBase} ${isActive ? "bg-white/10 text-white" : "text-white/60 hover:bg-white/5 hover:text-white"}`
           }
         >
-          <LayoutGrid size={18} />
-          Dashboard
+          <LayoutGrid size={20} />
         </NavLink>
         <NavLink
           to="/hoje"
+          title="Hoje"
           className={({ isActive }) =>
-            `${linkBase} ${isActive ? "bg-white/10 text-white" : "text-white/70 hover:bg-white/5 hover:text-white"}`
+            `${linkBase} ${isActive ? "bg-white/10 text-white" : "text-white/60 hover:bg-white/5 hover:text-white"}`
           }
         >
-          <CalendarCheck size={18} />
-          Hoje
+          <CalendarCheck size={20} />
         </NavLink>
       </nav>
-      <div className="px-5 py-5 text-xs text-white/40 flex items-center gap-2 border-t border-white/10">
-        <FolderKanban size={14} />
-        Dados salvos neste navegador
+      <div className="text-white/30 pb-1" title="Dados salvos num banco compartilhado">
+        <Database size={16} />
       </div>
     </aside>
   );

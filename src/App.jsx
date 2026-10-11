@@ -28,7 +28,7 @@ export default function App() {
     <HashRouter>
       <div className="flex min-h-screen">
         <Sidebar />
-        <main className="flex-1">
+        <main className="flex-1 min-w-0">
           {error && (
             <div className="m-6 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-sm px-4 py-3">
               Não consegui falar com a API ({error}). Confira se o servidor está rodando em{" "}

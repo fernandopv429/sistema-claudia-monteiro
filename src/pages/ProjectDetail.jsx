@@ -13,6 +13,7 @@ export default function ProjectDetail({ projects, refresh }) {
   const project = projects.find((p) => p.id === id);
   const [addingTo, setAddingTo] = useState(null);
   const [newTaskTitle, setNewTaskTitle] = useState("");
+  const [newTaskDeadline, setNewTaskDeadline] = useState(todayISO());
 
   if (!project) {
     return (
@@ -39,9 +40,10 @@ export default function ProjectDetail({ projects, refresh }) {
       projectId: project.id,
       phaseId,
       title: newTaskTitle.trim(),
-      deadline: todayISO(),
+      deadline: newTaskDeadline || todayISO(),
     });
     setNewTaskTitle("");
+    setNewTaskDeadline(todayISO());
     setAddingTo(null);
     await refresh();
   }
@@ -51,16 +53,26 @@ export default function ProjectDetail({ projects, refresh }) {
     await refresh();
   }
 
+  async function setProjectDeadline(deadline) {
+    await apiUpdateProject(project.id, { deadline });
+    await refresh();
+  }
+
+  async function setTaskDeadline(taskId, deadline) {
+    await updateTask(taskId, { deadline });
+    await refresh();
+  }
+
   return (
-    <div className="p-8 max-w-4xl mx-auto">
+    <div className="p-4 sm:p-8 max-w-4xl mx-auto overflow-x-hidden">
       <button onClick={() => navigate("/")} className="flex items-center gap-1 text-sm text-slate-500 hover:text-slate-700 mb-4">
         <ArrowLeft size={16} /> Dashboard
       </button>
 
-      <div className="flex items-start justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-semibold text-ink-900">{project.clientName}</h1>
-          <p className="text-sm text-slate-500">
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 mb-6">
+        <div className="min-w-0">
+          <h1 className="text-2xl font-semibold text-ink-900 truncate">{project.clientName}</h1>
+          <p className="text-sm text-slate-500 break-words">
             {project.clientType} · Responsável: {project.responsible || "-"} · Início em {formatDatePT(project.startDate)}
           </p>
         </div>
@@ -81,7 +93,15 @@ export default function ProjectDetail({ projects, refresh }) {
           <span className="text-sm font-semibold text-ink-900">{progress}%</span>
         </div>
         <ProgressBar value={progress} />
-        <div className="text-xs text-slate-400 mt-3">Prazo final previsto: {formatDatePT(project.deadline)}</div>
+        <div className="flex items-center gap-2 text-xs text-slate-400 mt-3">
+          Prazo final previsto:
+          <input
+            type="date"
+            value={project.deadline || ""}
+            onChange={(e) => setProjectDeadline(e.target.value)}
+            className="border border-slate-200 rounded px-1.5 py-0.5 text-xs text-slate-600"
+          />
+        </div>
       </div>
 
       <div className="flex items-center gap-2 mb-6 overflow-x-auto pb-1">
@@ -129,26 +149,37 @@ export default function ProjectDetail({ projects, refresh }) {
                           <Circle size={20} />
                         )}
                       </button>
-                      <div className={`flex-1 text-sm ${task.status === "Concluído" ? "line-through text-slate-400" : "text-ink-900"}`}>
+                      <div className={`flex-1 min-w-0 truncate text-sm ${task.status === "Concluído" ? "line-through text-slate-400" : "text-ink-900"}`}>
                         {task.title}
                       </div>
-                      <div className="text-xs text-slate-400 whitespace-nowrap">{task.responsible}</div>
-                      <div className={`text-xs font-medium whitespace-nowrap ${overdue ? "text-rose-600" : "text-slate-500"}`}>
-                        {formatDatePT(task.deadline)}
-                      </div>
+                      <div className="hidden sm:block text-xs text-slate-400 whitespace-nowrap">{task.responsible}</div>
+                      <input
+                        type="date"
+                        value={task.deadline || ""}
+                        onChange={(e) => setTaskDeadline(task.id, e.target.value)}
+                        className={`shrink-0 w-[8.5rem] text-xs font-medium border border-transparent hover:border-slate-200 rounded px-1 py-0.5 ${
+                          overdue ? "text-rose-600" : "text-slate-500"
+                        }`}
+                      />
                     </div>
                   );
                 })}
 
                 {addingTo === phase.id ? (
-                  <div className="flex items-center gap-2 px-4 py-3">
+                  <div className="flex flex-wrap items-center gap-2 px-4 py-3">
                     <input
                       autoFocus
                       value={newTaskTitle}
                       onChange={(e) => setNewTaskTitle(e.target.value)}
                       onKeyDown={(e) => e.key === "Enter" && addTask(phase.id)}
                       placeholder="Nova tarefa..."
-                      className="flex-1 text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-400"
+                      className="flex-1 min-w-[10rem] text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-400"
+                    />
+                    <input
+                      type="date"
+                      value={newTaskDeadline}
+                      onChange={(e) => setNewTaskDeadline(e.target.value)}
+                      className="text-sm border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-400"
                     />
                     <button
                       onClick={() => addTask(phase.id)}

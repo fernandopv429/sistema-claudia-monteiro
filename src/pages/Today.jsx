@@ -47,7 +47,7 @@ export default function Today({ projects, refresh }) {
                   {project.clientName} · {task.phaseName}
                 </button>
               </div>
-              <div className="text-xs text-slate-400 whitespace-nowrap">{task.responsible}</div>
+              <div className="hidden sm:block text-xs text-slate-400 whitespace-nowrap">{task.responsible}</div>
               <div className={`text-xs font-medium whitespace-nowrap ${tone === "danger" ? "text-rose-600" : "text-amber-600"}`}>
                 {relativeLabel(task.deadline)}
               </div>
@@ -59,7 +59,7 @@ export default function Today({ projects, refresh }) {
   }
 
   return (
-    <div className="p-8 max-w-4xl mx-auto">
+    <div className="p-4 sm:p-8 max-w-4xl mx-auto">
       <h1 className="text-2xl font-semibold text-ink-900 mb-1">Hoje</h1>
       <p className="text-sm text-slate-500 mb-6">Tudo que vence hoje ou já passou do prazo, de todos os clientes juntos.</p>
 
