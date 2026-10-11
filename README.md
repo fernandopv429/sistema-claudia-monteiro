@@ -66,33 +66,29 @@ fase), edita só esse arquivo — o resto do sistema se adapta sozinho.
 
 ## Deploy (Coolify / Docker)
 
-O projeto já vem com `docker-compose.yml` pronto pra subir os dois serviços
-juntos — testado localmente (build, proxy e persistência de dados sobrevivendo
-a um `docker compose down && up` de novo):
+Um `Dockerfile` só na raiz, container único: build do frontend (Vite) e o
+próprio processo Node/Express da API servindo os arquivos estáticos
+resultantes — sem nginx, sem Docker Compose, sem proxy reverso pra
+configurar. Testado localmente (build + Postgres real + frontend e API no
+mesmo container/porta).
 
-- **web**: build do frontend (Vite) servido por nginx na porta 80, que também
-  faz proxy de `/api/*` pro container da API — assim o frontend continua
-  usando a mesma URL relativa `/api` que usa em dev, sem precisar mexer em
-  CORS.
-- **api**: a API Node/Express na porta 4000. Os dados ficam num Postgres
-  externo (não sobe banco nenhum no compose) — a conexão é só uma variável
-  de ambiente.
-
-No Coolify: aponta um "Docker Compose" novo pra este repositório. Ele detecta
-o `docker-compose.yml` sozinho. Configurações (copia de `.env.example`):
+No Coolify: aponta um recurso novo pra este repositório. **Confirme que o
+"Build Pack" ficou como "Dockerfile"** (é o padrão quando ele acha um
+`Dockerfile` na raiz, mas vale conferir). Configurações (copia de
+`.env.example`):
 
 - `DATABASE_URL` (obrigatória) — string de conexão do Postgres.
 - `API_KEY` (opcional) — se não configurar, a API fica sem autenticação.
-- Exponha o serviço **web** (porta 80) com um domínio — é a única porta que
-  precisa ficar pública; o serviço **api** só é acessado internamente pelo
-  nginx do **web**.
+- O domínio aponta direto pro container — ele escuta na porta `4000`
+  (variável `PORT`, já com esse padrão).
 - Depois de ter o domínio, atualize a URL no último node do workflow do n8n
   ("Enviar para o Painel") pra `https://SEU-DOMINIO/api/meeting-notes`.
 
 Pra testar localmente antes de mandar pro Coolify:
 ```bash
-DATABASE_URL=postgres://... docker compose up -d --build
-curl http://localhost:3000/api/health
+docker build -t painel .
+docker run --rm -p 4000:4000 -e DATABASE_URL=postgres://... painel
+curl http://localhost:4000/api/health
 ```
 
 ### Build manual (sem Docker)
