@@ -3,6 +3,7 @@ import { withDb, readOnly, nextId } from "../db.js";
 import { buildProjectFromTemplate } from "../template.js";
 import { todayISO } from "../dates.js";
 import { emitEvent } from "../events.js";
+import { PROJECT_STATUSES, normalizeStatus } from "../status.js";
 
 export const projectsRouter = Router();
 
@@ -49,7 +50,9 @@ projectsRouter.patch("/:id", async (req, res) => {
     const project = db.projects.find((p) => p.id === req.params.id);
     if (!project) return null;
     for (const key of allowed) {
-      if (req.body && key in req.body) project[key] = req.body[key];
+      if (req.body && key in req.body) {
+        project[key] = key === "status" ? normalizeStatus(req.body[key], PROJECT_STATUSES) : req.body[key];
+      }
     }
     return project;
   });

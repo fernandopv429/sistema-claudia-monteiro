@@ -2,6 +2,7 @@ import { Router } from "express";
 import { withDb, readOnly, nextId } from "../db.js";
 import { todayISO } from "../dates.js";
 import { emitEvent } from "../events.js";
+import { TASK_STATUSES, normalizeStatus } from "../status.js";
 
 export const tasksRouter = Router();
 
@@ -80,7 +81,7 @@ tasksRouter.post("/", async (req, res) => {
       title: String(title),
       responsible: responsible || "",
       deadline: String(deadline),
-      status: status || "Pendente",
+      status: status ? normalizeStatus(status, TASK_STATUSES) : "Pendente",
     };
     project.tasks.push(task);
     return { task: flatten(project, task), project };
@@ -101,7 +102,9 @@ tasksRouter.patch("/:id", async (req, res) => {
       if (!task) continue;
       const wasCompleted = task.status === "Concluído";
       for (const key of allowed) {
-        if (req.body && key in req.body) task[key] = req.body[key];
+        if (req.body && key in req.body) {
+          task[key] = key === "status" ? normalizeStatus(req.body[key], TASK_STATUSES) : req.body[key];
+        }
       }
       if (req.body?.phaseId) {
         const phase = project.phases.find((p) => p.id === req.body.phaseId);
