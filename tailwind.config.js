@@ -5,20 +5,21 @@ export default {
     extend: {
       colors: {
         brand: {
-          50: "#f0f7f9",
-          100: "#d9ebf0",
-          200: "#b3d7e1",
-          300: "#80bdcd",
-          400: "#4a9cb5",
-          500: "#1c7293",
-          600: "#15607d",
-          700: "#124d65",
-          800: "#103f53",
-          900: "#0d3443",
+          // Laranja da marca FV Advogados (amostrado do logo).
+          50: "#fff3ec",
+          100: "#ffe1d0",
+          200: "#ffc3a1",
+          300: "#ffa06d",
+          400: "#fc8148",
+          500: "#f6692a",
+          600: "#db4f14",
+          700: "#b23d0f",
+          800: "#8a2f0d",
+          900: "#6b250b",
         },
         ink: {
-          900: "#21295c",
-          800: "#2a3270",
+          900: "#1a1a1a",
+          800: "#2b2b2b",
         },
       },
       fontFamily: {
