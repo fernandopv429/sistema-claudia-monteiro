@@ -2,6 +2,7 @@ import { Router } from "express";
 import { withDb, readOnly, nextId } from "../db.js";
 import { buildProjectFromTemplate } from "../template.js";
 import { todayISO } from "../dates.js";
+import { emitEvent } from "../events.js";
 
 export const projectsRouter = Router();
 
@@ -32,6 +33,14 @@ projectsRouter.post("/", async (req, res) => {
   });
 
   res.status(201).json(project);
+
+  const projectInfo = { id: project.id, clientName: project.clientName, clientType: project.clientType };
+  for (const task of project.tasks) {
+    emitEvent("task.created", {
+      task: { ...task, projectId: project.id, projectName: project.clientName, projectStatus: project.status },
+      project: projectInfo,
+    }).catch(() => {});
+  }
 });
 
 projectsRouter.patch("/:id", async (req, res) => {

@@ -8,19 +8,27 @@ webhooksRouter.get("/", async (req, res) => {
   res.json(await readOnly((db) => db.webhooks));
 });
 
-// POST /api/webhooks { url, hoursBefore? }
-// hoursBefore (padrão 24h): a partir de quantas horas antes do prazo avisar.
-// Tarefas já vencidas também avisam (uma vez cada).
+const EVENT_TYPES = ["task.created", "task.due_soon", "task.overdue", "task.completed"];
+
+// POST /api/webhooks { url, hoursBefore?, events? }
+// hoursBefore (padrão 24h): a partir de quantas horas antes do prazo avisar
+// (task.due_soon) — task.overdue dispara assim que o prazo passa.
+// events: lista de quais desses 4 tipos esse webhook quer receber
+// (EVENT_TYPES). Sem informar, recebe todos.
 webhooksRouter.post("/", async (req, res) => {
-  const { url, hoursBefore } = req.body || {};
+  const { url, hoursBefore, events } = req.body || {};
   if (!url || !/^https?:\/\//.test(url)) {
     return res.status(400).json({ error: "url válida (http/https) é obrigatória" });
+  }
+  if (events && (!Array.isArray(events) || events.some((e) => !EVENT_TYPES.includes(e)))) {
+    return res.status(400).json({ error: `events deve ser um array com valores entre: ${EVENT_TYPES.join(", ")}` });
   }
   const webhook = await withDb((db) => {
     const wh = {
       id: nextId(db, "wh"),
       url,
       hoursBefore: typeof hoursBefore === "number" ? hoursBefore : 24,
+      events: events || null,
       active: true,
       createdAt: new Date().toISOString(),
     };
@@ -31,7 +39,7 @@ webhooksRouter.post("/", async (req, res) => {
 });
 
 webhooksRouter.patch("/:id", async (req, res) => {
-  const allowed = ["url", "hoursBefore", "active"];
+  const allowed = ["url", "hoursBefore", "active", "events"];
   const updated = await withDb((db) => {
     const wh = db.webhooks.find((w) => w.id === req.params.id);
     if (!wh) return null;
@@ -55,18 +63,19 @@ webhooksRouter.delete("/:id", async (req, res) => {
 });
 
 // Dispara um payload de exemplo agora mesmo, pra validar a URL (N8N, etc.)
-// sem precisar esperar uma tarefa ficar perto do vencimento de verdade.
+// sem precisar esperar um evento real. ?event=task.created|task.due_soon|
+// task.overdue|task.completed (padrão: task.due_soon).
 webhooksRouter.post("/:id/test", async (req, res) => {
   const webhook = await readOnly((db) => db.webhooks.find((w) => w.id === req.params.id));
   if (!webhook) return res.status(404).json({ error: "Webhook não encontrado" });
 
+  const event = EVENT_TYPES.includes(req.query.event) ? req.query.event : "task.due_soon";
   const result = await sendWebhook(webhook.url, {
-    event: "task.due_soon",
+    event,
     test: true,
     triggeredAt: new Date().toISOString(),
-    overdue: false,
     hoursUntilDue: webhook.hoursBefore ?? 24,
-    task: { id: "task_teste", title: "Tarefa de teste", phase: "Diagnóstico", responsible: "Equipe", deadline: new Date().toISOString().slice(0, 10), status: "Pendente" },
+    task: { id: "task_teste", title: "Tarefa de teste", phase: "Diagnóstico", responsible: "Equipe", deadline: new Date().toISOString().slice(0, 10), status: event === "task.completed" ? "Concluído" : "Pendente" },
     project: { id: "proj_teste", clientName: "Cliente de teste", clientType: "Clínica" },
   });
   res.json(result);

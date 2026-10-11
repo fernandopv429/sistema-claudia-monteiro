@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { withDb, readOnly, nextId } from "../db.js";
 import { todayISO } from "../dates.js";
+import { emitEvent } from "../events.js";
 
 export const tasksRouter = Router();
 
@@ -11,6 +12,10 @@ function currentPhaseOf(project) {
     if (!allDone) return phase;
   }
   return project.phases[project.phases.length - 1];
+}
+
+function projectSummary(project) {
+  return { id: project.id, clientName: project.clientName, clientType: project.clientType };
 }
 
 function flatten(project, task) {
@@ -78,11 +83,13 @@ tasksRouter.post("/", async (req, res) => {
       status: status || "Pendente",
     };
     project.tasks.push(task);
-    return { task: flatten(project, task) };
+    return { task: flatten(project, task), project };
   });
 
   if (result.error) return res.status(result.code).json({ error: result.error });
   res.status(201).json(result.task);
+
+  emitEvent("task.created", { task: result.task, project: projectSummary(result.project) }).catch(() => {});
 });
 
 // PATCH /api/tasks/:id { title?, responsible?, deadline?, status?, phaseId? }
@@ -92,6 +99,7 @@ tasksRouter.patch("/:id", async (req, res) => {
     for (const project of db.projects) {
       const task = project.tasks.find((t) => t.id === req.params.id);
       if (!task) continue;
+      const wasCompleted = task.status === "Concluído";
       for (const key of allowed) {
         if (req.body && key in req.body) task[key] = req.body[key];
       }
@@ -99,10 +107,15 @@ tasksRouter.patch("/:id", async (req, res) => {
         const phase = project.phases.find((p) => p.id === req.body.phaseId);
         if (phase) task.phaseName = phase.name;
       }
-      return flatten(project, task);
+      const justCompleted = !wasCompleted && task.status === "Concluído";
+      return { task: flatten(project, task), project, justCompleted };
     }
     return null;
   });
   if (!result) return res.status(404).json({ error: "Tarefa não encontrada" });
-  res.json(result);
+  res.json(result.task);
+
+  if (result.justCompleted) {
+    emitEvent("task.completed", { task: result.task, project: projectSummary(result.project) }).catch(() => {});
+  }
 });

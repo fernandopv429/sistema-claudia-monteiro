@@ -16,6 +16,7 @@ Precisa dos dois rodando ao mesmo tempo, em dois terminais:
 # terminal 1 — API
 cd server
 npm install
+cp .env.example .env   # preenche DATABASE_URL com um Postgres de verdade
 npm run dev
 
 # terminal 2 — frontend
@@ -27,10 +28,12 @@ Abre em `http://localhost:5173`. O frontend fala com a API em
 `http://localhost:4000` através do proxy `/api` configurado no
 `vite.config.js`.
 
-> A API é a fonte de verdade dos dados agora (antes era `localStorage` do
-> navegador). Isso é o que permite a equipe inteira ver o mesmo painel, de
-> computadores diferentes, e permite outros sistemas (n8n, etc.) criarem e
-> consultarem tarefas — ver `server/API.md`.
+> A API (com dados num Postgres) é a fonte de verdade agora — antes era
+> `localStorage` do navegador, depois virou um arquivo JSON no servidor. Isso
+> é o que permite a equipe inteira ver o mesmo painel, de computadores
+> diferentes, e permite outros sistemas (n8n, etc.) criarem e consultarem
+> tarefas e reagirem a eventos (tarefa criada, perto do vencimento, atrasada,
+> concluída) — ver `server/API.md`.
 
 ## Telas
 
@@ -71,14 +74,15 @@ a um `docker compose down && up` de novo):
   faz proxy de `/api/*` pro container da API — assim o frontend continua
   usando a mesma URL relativa `/api` que usa em dev, sem precisar mexer em
   CORS.
-- **api**: a API Node/Express na porta 4000, com os dados (`server/data/`)
-  num volume Docker (`api_data`) — sobrevive a redeploys.
+- **api**: a API Node/Express na porta 4000. Os dados ficam num Postgres
+  externo (não sobe banco nenhum no compose) — a conexão é só uma variável
+  de ambiente.
 
 No Coolify: aponta um "Docker Compose" novo pra este repositório. Ele detecta
-o `docker-compose.yml` sozinho. Configurações:
+o `docker-compose.yml` sozinho. Configurações (copia de `.env.example`):
 
-- Variável de ambiente `API_KEY` (opcional) — copia de `.env.example`. Se não
-  configurar, a API fica sem autenticação.
+- `DATABASE_URL` (obrigatória) — string de conexão do Postgres.
+- `API_KEY` (opcional) — se não configurar, a API fica sem autenticação.
 - Exponha o serviço **web** (porta 80) com um domínio — é a única porta que
   precisa ficar pública; o serviço **api** só é acessado internamente pelo
   nginx do **web**.
@@ -87,7 +91,7 @@ o `docker-compose.yml` sozinho. Configurações:
 
 Pra testar localmente antes de mandar pro Coolify:
 ```bash
-docker compose up -d --build
+DATABASE_URL=postgres://... docker compose up -d --build
 curl http://localhost:3000/api/health
 ```
 

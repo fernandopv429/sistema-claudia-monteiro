@@ -71,37 +71,50 @@ Só `projectId`, `title` e `deadline` são obrigatórios.
 Atualiza uma tarefa (`title`, `responsible`, `deadline`, `status`, `phaseId`).
 É assim que o painel marca uma tarefa como concluída, por exemplo.
 
-## Webhooks (aviso de tarefa perto do vencimento)
+## Webhooks (eventos do sistema)
 
-A cada 15 minutos (e também ao criar/editar dados), o servidor varre todas as
-tarefas não concluídas e, para cada webhook ativo, dispara um `POST` para a
-`url` cadastrada quando o prazo da tarefa está dentro da janela `hoursBefore`
-configurada — **incluindo tarefas já atrasadas** (nesse caso `overdue: true`
-no payload). Cada combinação (tarefa + webhook + prazo) só notifica uma vez;
-se o prazo da tarefa mudar, ela pode notificar de novo.
+Um webhook recebe um `POST` quando algo acontece no painel. 4 tipos de
+evento:
+
+| Evento           | Quando dispara                                                        |
+|-------------------|-----------------------------------------------------------------------|
+| `task.created`    | Na hora, sempre que uma tarefa é criada (inclusive as do template, ao criar um projeto). |
+| `task.due_soon`   | Varredura a cada 15 min: tarefa não concluída dentro da janela `hoursBefore` antes do prazo. |
+| `task.overdue`    | Varredura a cada 15 min: tarefa não concluída cujo prazo já passou.    |
+| `task.completed`  | Na hora, quando o status de uma tarefa muda pra "Concluído".           |
+
+`task.due_soon`/`task.overdue` só notificam uma vez por (tarefa, webhook,
+prazo) — se o prazo da tarefa mudar, podem notificar de novo. `task.created`
+e `task.completed` disparam na hora, sem essa varredura.
 
 ### `POST /api/webhooks`
 ```json
-{ "url": "https://seu-n8n.com/webhook/tarefa-perto-do-prazo", "hoursBefore": 24 }
+{
+  "url": "https://seu-n8n.com/webhook/painel-eventos",
+  "hoursBefore": 24,
+  "events": ["task.due_soon", "task.overdue"]
+}
 ```
-`hoursBefore` é opcional (padrão 24h = a partir do início do dia do prazo).
+`hoursBefore` é opcional (padrão 24h, só vale pra `task.due_soon`).
+`events` é opcional — sem informar, o webhook recebe os 4 tipos.
 
 ### `GET /api/webhooks` · `PATCH /api/webhooks/:id` · `DELETE /api/webhooks/:id`
-Listar, editar (`url`, `hoursBefore`, `active`) ou remover.
+Listar, editar (`url`, `hoursBefore`, `events`, `active`) ou remover.
 
-### `POST /api/webhooks/:id/test`
-Dispara um payload de exemplo imediatamente pra validar a URL (não depende de
-ter uma tarefa real perto do vencimento).
+### `POST /api/webhooks/:id/test?event=task.created`
+Dispara um payload de exemplo imediatamente pra validar a URL, sem depender
+de um evento real. `event` é opcional (um dos 4 tipos acima, padrão
+`task.due_soon`).
 
 ### `POST /api/webhooks/run-check`
-Força a varredura agora (sem esperar os 15 min) — útil pra testar.
+Força a varredura de `task.due_soon`/`task.overdue` agora (sem esperar os 15
+min) — útil pra testar.
 
 ### Formato do payload enviado ao seu webhook
 ```json
 {
   "event": "task.due_soon",
   "triggeredAt": "2026-10-11T14:00:00.000Z",
-  "overdue": false,
   "hoursUntilDue": 18.5,
   "task": {
     "id": "task_abc",
@@ -118,6 +131,8 @@ Força a varredura agora (sem esperar os 15 min) — útil pra testar.
   }
 }
 ```
+`hoursUntilDue` só vem em `task.due_soon`/`task.overdue` (negativo quando já
+passou do prazo).
 
 ## Notas de reunião (caixa de entrada)
 
@@ -156,11 +171,15 @@ Marca a nota como vinculada a um projeto ou descartada: `{ "status": "Vinculada"
 ```bash
 cd server
 npm install
-npm run dev        # reinicia sozinho a cada mudança de arquivo
+cp .env.example .env   # preenche DATABASE_URL
+npm run dev            # reinicia sozinho a cada mudança de arquivo
 ```
 
-Variáveis de ambiente (opcionais): `PORT` (padrão 4000), `API_KEY` (se
-ausente, sem autenticação).
+Variáveis de ambiente: `DATABASE_URL` (obrigatória — string de conexão
+Postgres), `PORT` (padrão 4000), `API_KEY` (opcional — se ausente, sem
+autenticação).
 
-Dados ficam em `server/data/db.json` (criado automaticamente, populado com 4
-clientes de exemplo na primeira vez que o servidor sobe sem nenhum projeto).
+Todo o estado (projetos, fases, tarefas, webhooks, notas de reunião) fica
+numa única linha JSONB na tabela `app_state` desse Postgres — a tabela é
+criada sozinha no primeiro boot, e populada com 4 clientes de exemplo se
+estiver vazia.

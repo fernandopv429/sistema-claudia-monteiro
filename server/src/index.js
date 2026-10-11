@@ -1,3 +1,4 @@
+import "dotenv/config";
 import express from "express";
 import { projectsRouter } from "./routes/projects.js";
 import { tasksRouter } from "./routes/tasks.js";

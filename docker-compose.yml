@@ -16,11 +16,7 @@ services:
     environment:
       - PORT=4000
       - API_KEY=${API_KEY:-}
-    volumes:
-      - api_data:/app/data
+      - DATABASE_URL=${DATABASE_URL}
     ports:
       - "4000:4000"
     restart: unless-stopped
-
-volumes:
-  api_data:

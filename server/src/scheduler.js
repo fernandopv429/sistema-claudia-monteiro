@@ -1,30 +1,21 @@
 import { withDb } from "./db.js";
 import { hoursUntilDeadline } from "./dates.js";
+import { sendWebhook } from "./webhookClient.js";
+
+export { sendWebhook };
 
 const CHECK_INTERVAL_MS = 15 * 60 * 1000; // 15 min
 
-function notificationKey(taskId, webhookId, deadline) {
-  return `${taskId}::${webhookId}::${deadline}`;
-}
-
-export async function sendWebhook(url, payload) {
-  try {
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(10_000),
-    });
-    return { ok: res.ok, statusCode: res.status };
-  } catch (err) {
-    return { ok: false, error: err.message };
-  }
+function notificationKey(taskId, webhookId, deadline, eventType) {
+  return `${taskId}::${webhookId}::${deadline}::${eventType}`;
 }
 
 // Percorre os webhooks ativos e, para cada um, avisa sobre tarefas não
-// concluídas cujo prazo esteja dentro da janela configurada (ou já vencido).
-// Cada (tarefa, webhook, prazo) só dispara uma vez — se o prazo da tarefa
-// mudar depois, ela volta a poder notificar (a chave inclui o deadline).
+// concluídas cujo prazo esteja dentro da janela configurada. Dispara
+// "task.due_soon" enquanto o prazo ainda não passou e "task.overdue" assim
+// que passa — são eventos distintos, cada um só notifica uma vez por
+// (tarefa, webhook, prazo); se o prazo da tarefa mudar depois, volta a poder
+// notificar os dois de novo.
 export async function checkDueSoonAndNotify(log = console.log) {
   const now = new Date();
   const jobs = [];
@@ -38,21 +29,22 @@ export async function checkDueSoonAndNotify(log = console.log) {
       for (const task of project.tasks) {
         if (task.status === "Concluído") continue;
         const hours = hoursUntilDeadline(task.deadline, now);
+        const eventType = hours < 0 ? "task.overdue" : "task.due_soon";
 
         for (const webhook of activeWebhooks) {
+          if (webhook.events && !webhook.events.includes(eventType)) continue;
           const threshold = webhook.hoursBefore ?? 24;
           if (hours > threshold) continue;
 
-          const key = notificationKey(task.id, webhook.id, task.deadline);
+          const key = notificationKey(task.id, webhook.id, task.deadline, eventType);
           if (sentKeys.has(key)) continue;
 
           jobs.push({
             key,
             webhook,
             payload: {
-              event: "task.due_soon",
+              event: eventType,
               triggeredAt: now.toISOString(),
-              overdue: hours < 0,
               hoursUntilDue: Math.round(hours * 10) / 10,
               task: {
                 id: task.id,
@@ -77,7 +69,7 @@ export async function checkDueSoonAndNotify(log = console.log) {
   for (const job of jobs) {
     const result = await sendWebhook(job.webhook.url, job.payload);
     log(
-      `[webhook] ${job.payload.task.title} -> ${job.webhook.url} :: ${result.ok ? "ok" : "falhou"}${
+      `[webhook] ${job.payload.event} ${job.payload.task.title} -> ${job.webhook.url} :: ${result.ok ? "ok" : "falhou"}${
         result.error ? ` (${result.error})` : ""
       }`
     );

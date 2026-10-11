@@ -1,59 +1,52 @@
-import { readFile, writeFile, mkdir } from "node:fs/promises";
-import { existsSync } from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DATA_DIR = path.join(__dirname, "..", "data");
-const DB_FILE = path.join(DATA_DIR, "db.json");
+import pg from "pg";
 
 const EMPTY_DB = { projects: [], webhooks: [], notifications: [], meetingNotes: [], idCounter: 1 };
 
-// Escreve sempre em série (uma promessa de cada vez) pra não ter duas
-// chamadas simultâneas pisando uma na outra no mesmo arquivo.
-let queue = Promise.resolve();
-function serialize(fn) {
-  const result = queue.then(fn);
-  queue = result.then(
-    () => undefined,
-    () => undefined
-  );
-  return result;
+const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+
+let ready = null;
+function ensureTable() {
+  if (!ready) {
+    ready = pool
+      .query(
+        `CREATE TABLE IF NOT EXISTS app_state (
+           id SMALLINT PRIMARY KEY,
+           data JSONB NOT NULL
+         )`
+      )
+      .then(() => pool.query(`INSERT INTO app_state (id, data) VALUES (1, $1) ON CONFLICT (id) DO NOTHING`, [EMPTY_DB]));
+  }
+  return ready;
 }
 
-async function ensureDb() {
-  if (!existsSync(DATA_DIR)) await mkdir(DATA_DIR, { recursive: true });
-  if (!existsSync(DB_FILE)) await writeFile(DB_FILE, JSON.stringify(EMPTY_DB, null, 2));
-}
-
-async function readDb() {
-  await ensureDb();
-  const raw = await readFile(DB_FILE, "utf-8");
+// Uma transação com "SELECT ... FOR UPDATE" trava a linha até o COMMIT, o
+// que serializa escritas concorrentes de verdade (inclusive entre processos
+// diferentes — útil porque agora quem escreve aqui não é só o painel, é
+// também o n8n criando tarefa via WhatsApp, webhooks, etc).
+export async function withDb(mutator) {
+  await ensureTable();
+  const client = await pool.connect();
   try {
-    return { ...EMPTY_DB, ...JSON.parse(raw) };
-  } catch {
-    return { ...EMPTY_DB };
+    await client.query("BEGIN");
+    const { rows } = await client.query("SELECT data FROM app_state WHERE id = 1 FOR UPDATE");
+    const db = { ...EMPTY_DB, ...rows[0].data };
+    const result = await mutator(db);
+    await client.query("UPDATE app_state SET data = $1 WHERE id = 1", [JSON.stringify(db)]);
+    await client.query("COMMIT");
+    return result;
+  } catch (err) {
+    await client.query("ROLLBACK").catch(() => {});
+    throw err;
+  } finally {
+    client.release();
   }
 }
 
-async function writeDb(db) {
-  await writeFile(DB_FILE, JSON.stringify(db, null, 2));
-}
-
-export function withDb(mutator) {
-  return serialize(async () => {
-    const db = await readDb();
-    const result = await mutator(db);
-    await writeDb(db);
-    return result;
-  });
-}
-
-export function readOnly(reader) {
-  return serialize(async () => {
-    const db = await readDb();
-    return reader(db);
-  });
+export async function readOnly(reader) {
+  await ensureTable();
+  const { rows } = await pool.query("SELECT data FROM app_state WHERE id = 1");
+  const db = { ...EMPTY_DB, ...rows[0].data };
+  return reader(db);
 }
 
 export function nextId(db, prefix) {
