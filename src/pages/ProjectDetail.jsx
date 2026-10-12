@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, CheckCircle2, Circle, Plus, Check } from "lucide-react";
 import ProgressBar from "../components/ProgressBar";
 import { StatusPill } from "../components/Badges";
 import { computeProgress, currentPhase } from "../lib/store";
-import { updateTask, createTask, updateProject as apiUpdateProject } from "../lib/api";
+import { updateTask, createTask, updateProject as apiUpdateProject, listResponsibles } from "../lib/api";
 import { formatDatePT, isOverdue, todayISO } from "../lib/dates";
 
 export default function ProjectDetail({ projects, refresh }) {
@@ -14,6 +14,12 @@ export default function ProjectDetail({ projects, refresh }) {
   const [addingTo, setAddingTo] = useState(null);
   const [newTaskTitle, setNewTaskTitle] = useState("");
   const [newTaskDeadline, setNewTaskDeadline] = useState(todayISO());
+  const [newTaskResponsibleId, setNewTaskResponsibleId] = useState("");
+  const [responsibles, setResponsibles] = useState([]);
+
+  useEffect(() => {
+    listResponsibles().then(setResponsibles).catch(() => {});
+  }, []);
 
   if (!project) {
     return (
@@ -41,9 +47,11 @@ export default function ProjectDetail({ projects, refresh }) {
       phaseId,
       title: newTaskTitle.trim(),
       deadline: newTaskDeadline || todayISO(),
+      responsibleId: newTaskResponsibleId || undefined,
     });
     setNewTaskTitle("");
     setNewTaskDeadline(todayISO());
+    setNewTaskResponsibleId("");
     setAddingTo(null);
     await refresh();
   }
@@ -181,6 +189,18 @@ export default function ProjectDetail({ projects, refresh }) {
                       onChange={(e) => setNewTaskDeadline(e.target.value)}
                       className="text-sm border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-400"
                     />
+                    <select
+                      value={newTaskResponsibleId}
+                      onChange={(e) => setNewTaskResponsibleId(e.target.value)}
+                      className="text-sm border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-400"
+                    >
+                      <option value="">Sem responsável</option>
+                      {responsibles.map((r) => (
+                        <option key={r.id} value={r.id}>
+                          {r.name}
+                        </option>
+                      ))}
+                    </select>
                     <button
                       onClick={() => addTask(phase.id)}
                       className="text-xs font-medium text-white bg-brand-500 hover:bg-brand-600 px-3 py-1.5 rounded-lg"

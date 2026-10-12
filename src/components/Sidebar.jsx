@@ -1,5 +1,5 @@
 import { NavLink } from "react-router-dom";
-import { LayoutGrid, CalendarCheck, Database } from "lucide-react";
+import { LayoutGrid, CalendarCheck, Users, Database } from "lucide-react";
 
 const linkBase =
   "flex items-center justify-center w-11 h-11 rounded-xl transition-colors";
@@ -32,6 +32,15 @@ export default function Sidebar() {
           }
         >
           <CalendarCheck size={20} />
+        </NavLink>
+        <NavLink
+          to="/responsaveis"
+          title="Responsáveis"
+          className={({ isActive }) =>
+            `${linkBase} ${isActive ? "bg-white/10 text-white" : "text-white/60 hover:bg-white/5 hover:text-white"}`
+          }
+        >
+          <Users size={20} />
         </NavLink>
       </nav>
       <div className="text-white/30 pb-1" title="Dados salvos num banco compartilhado">

@@ -61,3 +61,19 @@ export function deleteWebhook(id) {
 export function testWebhook(id) {
   return request(`/webhooks/${id}/test`, { method: "POST" });
 }
+
+export function listResponsibles() {
+  return request("/responsibles");
+}
+
+export function createResponsible(data) {
+  return request("/responsibles", { method: "POST", body: JSON.stringify(data) });
+}
+
+export function updateResponsible(id, patch) {
+  return request(`/responsibles/${id}`, { method: "PATCH", body: JSON.stringify(patch) });
+}
+
+export function deleteResponsible(id) {
+  return request(`/responsibles/${id}`, { method: "DELETE" });
+}

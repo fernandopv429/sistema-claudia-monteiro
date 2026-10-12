@@ -1,6 +1,6 @@
 import pg from "pg";
 
-const EMPTY_DB = { projects: [], webhooks: [], notifications: [], meetingNotes: [], idCounter: 1 };
+const EMPTY_DB = { projects: [], webhooks: [], notifications: [], meetingNotes: [], responsibles: [], idCounter: 1 };
 
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
 

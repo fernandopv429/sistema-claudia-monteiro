@@ -7,6 +7,7 @@ import { projectsRouter } from "./routes/projects.js";
 import { tasksRouter } from "./routes/tasks.js";
 import { webhooksRouter } from "./routes/webhooks.js";
 import { meetingNotesRouter } from "./routes/meetingNotes.js";
+import { responsiblesRouter } from "./routes/responsibles.js";
 import { startScheduler } from "./scheduler.js";
 import { withDb } from "./db.js";
 import { seedDemoData } from "./seed.js";
@@ -33,6 +34,7 @@ app.use("/api/projects", projectsRouter);
 app.use("/api/tasks", tasksRouter);
 app.use("/api/webhooks", webhooksRouter);
 app.use("/api/meeting-notes", meetingNotesRouter);
+app.use("/api/responsibles", responsiblesRouter);
 
 // Um container só: o mesmo processo Node serve a API e os arquivos
 // estáticos do frontend (gerados por "npm run build" na raiz) — evita

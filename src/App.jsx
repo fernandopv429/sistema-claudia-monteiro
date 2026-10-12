@@ -4,6 +4,7 @@ import Sidebar from "./components/Sidebar";
 import Dashboard from "./pages/Dashboard";
 import Today from "./pages/Today";
 import ProjectDetail from "./pages/ProjectDetail";
+import Responsibles from "./pages/Responsibles";
 import { listProjects } from "./lib/api";
 
 export default function App() {
@@ -40,6 +41,7 @@ export default function App() {
               <Route path="/" element={<Dashboard projects={projects} refresh={refresh} />} />
               <Route path="/hoje" element={<Today projects={projects} refresh={refresh} />} />
               <Route path="/projeto/:id" element={<ProjectDetail projects={projects} refresh={refresh} />} />
+              <Route path="/responsaveis" element={<Responsibles />} />
             </Routes>
           )}
         </main>

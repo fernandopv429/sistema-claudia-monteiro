@@ -19,12 +19,14 @@ function projectSummary(project) {
   return { id: project.id, clientName: project.clientName, clientType: project.clientType };
 }
 
-function flatten(project, task) {
+function flatten(project, task, responsibles = []) {
+  const resp = task.responsibleId ? responsibles.find((r) => r.id === task.responsibleId) : null;
   return {
     ...task,
     projectId: project.id,
     projectName: project.clientName,
     projectStatus: project.status,
+    responsiblePhone: resp ? resp.phone : null,
   };
 }
 
@@ -33,8 +35,8 @@ tasksRouter.get("/", async (req, res) => {
   const { projectId, status, overdue, dueOn, dueBefore, dueAfter } = req.query;
   const today = todayISO();
 
-  const projects = await readOnly((db) => db.projects);
-  let tasks = projects.flatMap((p) => p.tasks.map((t) => flatten(p, t)));
+  const db = await readOnly((db) => db);
+  let tasks = db.projects.flatMap((p) => p.tasks.map((t) => flatten(p, t, db.responsibles)));
 
   if (projectId) tasks = tasks.filter((t) => t.projectId === projectId);
   if (status) tasks = tasks.filter((t) => t.status === status);
@@ -48,18 +50,21 @@ tasksRouter.get("/", async (req, res) => {
 });
 
 tasksRouter.get("/:id", async (req, res) => {
-  const projects = await readOnly((db) => db.projects);
-  for (const project of projects) {
+  const db = await readOnly((db) => db);
+  for (const project of db.projects) {
     const task = project.tasks.find((t) => t.id === req.params.id);
-    if (task) return res.json(flatten(project, task));
+    if (task) return res.json(flatten(project, task, db.responsibles));
   }
   res.status(404).json({ error: "Tarefa não encontrada" });
 });
 
-// POST /api/tasks { projectId, title, deadline, responsible?, status?, phaseId? | phaseName? }
+// POST /api/tasks { projectId, title, deadline, responsible?, responsibleId?, status?, phaseId? | phaseName? }
 // Sem phaseId/phaseName, a tarefa entra na fase atual do projeto.
+// responsibleId (opcional) vincula a tarefa a alguém cadastrado em
+// /api/responsibles — é o telefone dessa pessoa que recebe as notificações
+// de prazo. Sem responsibleId, "responsible" fica só como texto livre.
 tasksRouter.post("/", async (req, res) => {
-  const { projectId, title, deadline, responsible, status, phaseId, phaseName } = req.body || {};
+  const { projectId, title, deadline, responsible, responsibleId, status, phaseId, phaseName } = req.body || {};
   if (!projectId || !title || !deadline) {
     return res.status(400).json({ error: "projectId, title e deadline são obrigatórios" });
   }
@@ -74,17 +79,20 @@ tasksRouter.post("/", async (req, res) => {
     if (!phase) phase = currentPhaseOf(project);
     if (!phase) return { error: "Projeto não tem fases", code: 400 };
 
+    const linkedResponsible = responsibleId ? db.responsibles.find((r) => r.id === responsibleId) : null;
+
     const task = {
       id: nextId(db, "task"),
       phaseId: phase.id,
       phaseName: phase.name,
       title: String(title),
-      responsible: responsible || "",
+      responsible: responsible || linkedResponsible?.name || "",
+      responsibleId: linkedResponsible ? linkedResponsible.id : null,
       deadline: String(deadline),
       status: status ? normalizeStatus(status, TASK_STATUSES) : "Pendente",
     };
     project.tasks.push(task);
-    return { task: flatten(project, task), project };
+    return { task: flatten(project, task, db.responsibles), project };
   });
 
   if (result.error) return res.status(result.code).json({ error: result.error });
@@ -93,9 +101,9 @@ tasksRouter.post("/", async (req, res) => {
   emitEvent("task.created", { task: result.task, project: projectSummary(result.project) }).catch(() => {});
 });
 
-// PATCH /api/tasks/:id { title?, responsible?, deadline?, status?, phaseId? }
+// PATCH /api/tasks/:id { title?, responsible?, responsibleId?, deadline?, status?, phaseId? }
 tasksRouter.patch("/:id", async (req, res) => {
-  const allowed = ["title", "responsible", "deadline", "status", "phaseId"];
+  const allowed = ["title", "responsible", "responsibleId", "deadline", "status", "phaseId"];
   const result = await withDb((db) => {
     for (const project of db.projects) {
       const task = project.tasks.find((t) => t.id === req.params.id);
@@ -106,12 +114,16 @@ tasksRouter.patch("/:id", async (req, res) => {
           task[key] = key === "status" ? normalizeStatus(req.body[key], TASK_STATUSES) : req.body[key];
         }
       }
+      if (req.body?.responsibleId && !("responsible" in (req.body || {}))) {
+        const linked = db.responsibles.find((r) => r.id === req.body.responsibleId);
+        if (linked) task.responsible = linked.name;
+      }
       if (req.body?.phaseId) {
         const phase = project.phases.find((p) => p.id === req.body.phaseId);
         if (phase) task.phaseName = phase.name;
       }
       const justCompleted = !wasCompleted && task.status === "Concluído";
-      return { task: flatten(project, task), project, justCompleted };
+      return { task: flatten(project, task, db.responsibles), project, justCompleted };
     }
     return null;
   });

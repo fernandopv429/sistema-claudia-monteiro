@@ -51,6 +51,9 @@ export async function checkDueSoonAndNotify(log = console.log) {
                 title: task.title,
                 phase: task.phaseName,
                 responsible: task.responsible,
+                responsiblePhone: task.responsibleId
+                  ? db.responsibles.find((r) => r.id === task.responsibleId)?.phone ?? null
+                  : null,
                 deadline: task.deadline,
                 status: task.status,
               },
