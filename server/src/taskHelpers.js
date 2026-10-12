@@ -1,5 +1,6 @@
 import { nextId } from "./db.js";
 import { TASK_STATUSES, normalizeStatus } from "./status.js";
+import { todayISO } from "./dates.js";
 
 export function currentPhaseOf(project) {
   for (const phase of project.phases) {
@@ -43,6 +44,7 @@ export function buildTask(db, project, { title, deadline, responsible, responsib
     deadline: String(deadline),
     status: status ? normalizeStatus(status, TASK_STATUSES) : "Pendente",
     source: source || null,
+    createdAt: todayISO(),
   };
   project.tasks.push(task);
   return task;

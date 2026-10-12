@@ -162,6 +162,14 @@ export default function ProjectDetail({ projects, refresh }) {
                         {task.source === "meet" && <MeetTag />}
                       </div>
                       <div className="hidden sm:block text-xs text-slate-400 whitespace-nowrap">{task.responsible}</div>
+                      {task.createdAt && (
+                        <div
+                          className="hidden md:block text-[11px] text-slate-300 whitespace-nowrap"
+                          title={`Criada em ${formatDatePT(task.createdAt)}`}
+                        >
+                          {formatDatePT(task.createdAt)}
+                        </div>
+                      )}
                       <input
                         type="date"
                         value={task.deadline || ""}
