@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, CheckCircle2, Circle, Plus, Check } from "lucide-react";
 import ProgressBar from "../components/ProgressBar";
-import { StatusPill, MeetTag } from "../components/Badges";
+import { StatusPill, MeetTag, MeetingSourceTag } from "../components/Badges";
 import { computeProgress, currentPhase } from "../lib/store";
 import { updateTask, createTask, updateProject as apiUpdateProject, listResponsibles } from "../lib/api";
 import { formatDatePT, isOverdue, todayISO } from "../lib/dates";
@@ -66,6 +66,11 @@ export default function ProjectDetail({ projects, refresh }) {
     await refresh();
   }
 
+  async function setMeetingSource(meetingSource) {
+    await apiUpdateProject(project.id, { meetingSource });
+    await refresh();
+  }
+
   async function setTaskDeadline(taskId, deadline) {
     await updateTask(taskId, { deadline });
     await refresh();
@@ -79,20 +84,36 @@ export default function ProjectDetail({ projects, refresh }) {
 
       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 mb-6">
         <div className="min-w-0">
-          <h1 className="text-2xl font-semibold text-ink-900 truncate">{project.clientName}</h1>
+          <div className="flex items-center gap-2 flex-wrap">
+            <h1 className="text-2xl font-semibold text-ink-900 truncate">{project.clientName}</h1>
+            <MeetingSourceTag source={project.meetingSource} />
+          </div>
           <p className="text-sm text-slate-500 break-words">
             {project.clientType} · Responsável: {project.responsible || "-"} · Início em {formatDatePT(project.startDate)}
           </p>
         </div>
-        <select
-          value={project.status}
-          onChange={(e) => setProjectStatus(e.target.value)}
-          className="border border-slate-200 rounded-lg text-sm px-3 py-1.5"
-        >
-          <option>Ativo</option>
-          <option>Pausado</option>
-          <option>Concluído</option>
-        </select>
+        <div className="flex items-center gap-2 shrink-0">
+          <select
+            value={project.meetingSource || ""}
+            onChange={(e) => setMeetingSource(e.target.value)}
+            title="Fonte das reuniões"
+            className="border border-slate-200 rounded-lg text-sm px-2 py-1.5 text-slate-500"
+          >
+            <option value="">Reuniões: -</option>
+            <option value="Meet">Google Meet</option>
+            <option value="Teams">Microsoft Teams</option>
+            <option value="Outro">Outro</option>
+          </select>
+          <select
+            value={project.status}
+            onChange={(e) => setProjectStatus(e.target.value)}
+            className="border border-slate-200 rounded-lg text-sm px-3 py-1.5"
+          >
+            <option>Ativo</option>
+            <option>Pausado</option>
+            <option>Concluído</option>
+          </select>
+        </div>
       </div>
 
       {(project.notes || project.meetingLink) && (

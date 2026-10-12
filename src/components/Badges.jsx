@@ -35,6 +35,28 @@ export function MeetTag() {
   );
 }
 
+const MEETING_SOURCE_STYLES = {
+  Meet: "bg-emerald-50 text-emerald-700 border-emerald-100",
+  Teams: "bg-indigo-50 text-indigo-700 border-indigo-100",
+  Outro: "bg-slate-100 text-slate-600 border-slate-200",
+};
+
+const MEETING_SOURCE_LABELS = {
+  Meet: "Google Meet",
+  Teams: "Microsoft Teams",
+  Outro: "Outro",
+};
+
+export function MeetingSourceTag({ source }) {
+  if (!source) return null;
+  const cls = MEETING_SOURCE_STYLES[source] || MEETING_SOURCE_STYLES.Outro;
+  return (
+    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${cls}`}>
+      {MEETING_SOURCE_LABELS[source] || source}
+    </span>
+  );
+}
+
 export function OverdueTag({ count }) {
   if (!count) return null;
   return (

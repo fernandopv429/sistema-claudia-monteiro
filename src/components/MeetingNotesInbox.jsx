@@ -114,6 +114,7 @@ export default function MeetingNotesInbox({ projects, onLinked }) {
           initialClientName={creatingNote.title}
           initialNotes={creatingNote.summary || ""}
           initialMeetingLink={creatingNote.sourceUrl || ""}
+          initialMeetingSource="Meet"
           saving={busy === creatingNote.id}
           onClose={() => setCreatingFor(null)}
           onCreate={createAndLink}

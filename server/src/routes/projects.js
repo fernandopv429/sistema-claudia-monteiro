@@ -46,7 +46,7 @@ projectsRouter.get("/:id", async (req, res) => {
 // "notes"/"meetingLink" existem pra quando o projeto nasce a partir de uma nota
 // de reunião do Meet (resumo e link da nota, pra não perder esse contexto).
 projectsRouter.post("/", async (req, res) => {
-  const { clientName, clientType, responsible, contactEmail, startDate, ownerResponsibleId, notes, meetingLink } = req.body || {};
+  const { clientName, clientType, responsible, contactEmail, startDate, ownerResponsibleId, notes, meetingLink, meetingSource } = req.body || {};
   if (!clientName || !clientName.trim()) {
     return res.status(400).json({ error: "clientName é obrigatório" });
   }
@@ -59,6 +59,7 @@ projectsRouter.post("/", async (req, res) => {
     built.ownerResponsibleId = ownerResponsibleId || null;
     built.notes = notes || "";
     built.meetingLink = meetingLink || "";
+    built.meetingSource = meetingSource || "";
     db.projects.unshift(built);
     return built;
   });
@@ -75,7 +76,7 @@ projectsRouter.post("/", async (req, res) => {
 });
 
 projectsRouter.patch("/:id", async (req, res) => {
-  const allowed = ["clientName", "clientType", "responsible", "contactEmail", "status", "startDate", "deadline", "ownerResponsibleId", "notes", "meetingLink"];
+  const allowed = ["clientName", "clientType", "responsible", "contactEmail", "status", "startDate", "deadline", "ownerResponsibleId", "notes", "meetingLink", "meetingSource"];
   const updated = await withDb((db) => {
     const project = db.projects.find((p) => p.id === req.params.id);
     if (!project) return null;

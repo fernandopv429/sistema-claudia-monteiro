@@ -3,7 +3,15 @@ import { X } from "lucide-react";
 import { todayISO } from "../lib/dates";
 import { listResponsibles } from "../lib/api";
 
-export default function NewProjectModal({ onClose, onCreate, saving, initialClientName = "", initialNotes = "", initialMeetingLink = "" }) {
+export default function NewProjectModal({
+  onClose,
+  onCreate,
+  saving,
+  initialClientName = "",
+  initialNotes = "",
+  initialMeetingLink = "",
+  initialMeetingSource = "",
+}) {
   const [form, setForm] = useState({
     clientName: initialClientName,
     clientType: "Clínica",
@@ -13,6 +21,7 @@ export default function NewProjectModal({ onClose, onCreate, saving, initialClie
     ownerResponsibleId: "",
     notes: initialNotes,
     meetingLink: initialMeetingLink,
+    meetingSource: initialMeetingSource,
   });
   const [responsibles, setResponsibles] = useState([]);
 
@@ -101,6 +110,19 @@ export default function NewProjectModal({ onClose, onCreate, saving, initialClie
             <p className="text-xs text-slate-400 mt-1">
               Quando essa pessoa falar com o agente pelo WhatsApp, só vê os projetos que são dela.
             </p>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Fonte das reuniões</label>
+            <select
+              value={form.meetingSource}
+              onChange={(e) => update("meetingSource", e.target.value)}
+              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-400"
+            >
+              <option value="">Não definido</option>
+              <option value="Meet">Google Meet</option>
+              <option value="Teams">Microsoft Teams</option>
+              <option value="Outro">Outro</option>
+            </select>
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Link da reunião / nota</label>
