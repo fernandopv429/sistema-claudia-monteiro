@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { X } from "lucide-react";
 import { todayISO } from "../lib/dates";
+import { listResponsibles } from "../lib/api";
 
 export default function NewProjectModal({ onClose, onCreate, saving }) {
   const [form, setForm] = useState({
@@ -9,7 +10,13 @@ export default function NewProjectModal({ onClose, onCreate, saving }) {
     responsible: "",
     contactEmail: "",
     startDate: todayISO(),
+    ownerResponsibleId: "",
   });
+  const [responsibles, setResponsibles] = useState([]);
+
+  useEffect(() => {
+    listResponsibles().then(setResponsibles).catch(() => {});
+  }, []);
 
   function update(field, value) {
     setForm((f) => ({ ...f, [field]: value }));
@@ -74,6 +81,24 @@ export default function NewProjectModal({ onClose, onCreate, saving }) {
               placeholder="Ex: Dra. Fernanda"
               className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-400"
             />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Dono interno do projeto</label>
+            <select
+              value={form.ownerResponsibleId}
+              onChange={(e) => update("ownerResponsibleId", e.target.value)}
+              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-400"
+            >
+              <option value="">Nenhum (visível pra todo mundo)</option>
+              {responsibles.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.name}
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-slate-400 mt-1">
+              Quando essa pessoa falar com o agente pelo WhatsApp, só vê os projetos que são dela.
+            </p>
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">E-mail de contato</label>

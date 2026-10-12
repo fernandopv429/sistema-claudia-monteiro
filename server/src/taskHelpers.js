@@ -11,6 +11,15 @@ export function currentPhaseOf(project) {
   return project.phases[project.phases.length - 1];
 }
 
+// O agente de IA às vezes erra a conta de datas relativas e manda um deadline
+// no passado (já visto: "daqui a 2 dias" virar uma data de meses atrás). Em
+// vez de confiar cegamente, nunca deixa gravar uma tarefa que já nasce
+// atrasada — empurra pra hoje.
+export function clampFutureDeadline(deadlineISO) {
+  const today = todayISO();
+  return deadlineISO && deadlineISO < today ? today : deadlineISO;
+}
+
 export function flattenTask(project, task, responsibles = []) {
   const resp = task.responsibleId ? responsibles.find((r) => r.id === task.responsibleId) : null;
   return {
@@ -41,7 +50,7 @@ export function buildTask(db, project, { title, deadline, responsible, responsib
     title: String(title),
     responsible: responsible || linkedResponsible?.name || "",
     responsibleId: linkedResponsible ? linkedResponsible.id : null,
-    deadline: String(deadline),
+    deadline: clampFutureDeadline(String(deadline)),
     status: status ? normalizeStatus(status, TASK_STATUSES) : "Pendente",
     source: source || null,
     createdAt: todayISO(),

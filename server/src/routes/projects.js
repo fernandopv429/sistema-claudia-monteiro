@@ -4,11 +4,31 @@ import { buildProjectFromTemplate } from "../template.js";
 import { todayISO } from "../dates.js";
 import { emitEvent } from "../events.js";
 import { PROJECT_STATUSES, normalizeStatus } from "../status.js";
+import { onlyDigits } from "../phone.js";
 
 export const projectsRouter = Router();
 
+// Acha o id do responsável cadastrado dono desse telefone, ou null.
+function ownerIdForPhone(db, phone) {
+  const digits = onlyDigits(phone);
+  if (!digits) return null;
+  const match = db.responsibles.find((r) => onlyDigits(r.phone) === digits);
+  return match ? match.id : null;
+}
+
+// GET /api/projects?phone=5511999999999
+// Sem "phone" (uso normal do painel web), devolve tudo. Com "phone" (usado
+// pelo agente do WhatsApp via listar_projetos), devolve só os projetos cujo
+// ownerResponsibleId bate com o responsável dono desse telefone — assim cada
+// pessoa só vê/mexe nos projetos que são dela. Telefone não cadastrado ou sem
+// projeto nenhum vinculado = lista vazia, nunca a lista inteira.
 projectsRouter.get("/", async (req, res) => {
-  const projects = await readOnly((db) => db.projects);
+  const db = await readOnly((db) => db);
+  let projects = db.projects;
+  if (req.query.phone) {
+    const ownerId = ownerIdForPhone(db, req.query.phone);
+    projects = ownerId ? projects.filter((p) => p.ownerResponsibleId === ownerId) : [];
+  }
   res.json(projects);
 });
 
@@ -18,8 +38,13 @@ projectsRouter.get("/:id", async (req, res) => {
   res.json(project);
 });
 
+// POST /api/projects { clientName, clientType?, responsible?, contactEmail?, startDate?, ownerResponsibleId? }
+// "responsible" é o contato do lado do cliente (texto livre, ex: "Dra. Fernanda").
+// "ownerResponsibleId" é quem, do seu time, é dono desse projeto — é o que
+// decide quais projetos aparecem pra essa pessoa quando ela fala com o agente
+// pelo WhatsApp (veja GET acima).
 projectsRouter.post("/", async (req, res) => {
-  const { clientName, clientType, responsible, contactEmail, startDate } = req.body || {};
+  const { clientName, clientType, responsible, contactEmail, startDate, ownerResponsibleId } = req.body || {};
   if (!clientName || !clientName.trim()) {
     return res.status(400).json({ error: "clientName é obrigatório" });
   }
@@ -29,6 +54,7 @@ projectsRouter.post("/", async (req, res) => {
       { clientName, clientType, responsible, contactEmail, startDate },
       { nextId: (prefix) => nextId(db, prefix), todayISO }
     );
+    built.ownerResponsibleId = ownerResponsibleId || null;
     db.projects.unshift(built);
     return built;
   });
@@ -45,7 +71,7 @@ projectsRouter.post("/", async (req, res) => {
 });
 
 projectsRouter.patch("/:id", async (req, res) => {
-  const allowed = ["clientName", "clientType", "responsible", "contactEmail", "status", "startDate", "deadline"];
+  const allowed = ["clientName", "clientType", "responsible", "contactEmail", "status", "startDate", "deadline", "ownerResponsibleId"];
   const updated = await withDb((db) => {
     const project = db.projects.find((p) => p.id === req.params.id);
     if (!project) return null;

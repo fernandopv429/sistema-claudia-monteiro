@@ -3,7 +3,15 @@ import { withDb, readOnly } from "../db.js";
 import { todayISO } from "../dates.js";
 import { emitEvent } from "../events.js";
 import { TASK_STATUSES, normalizeStatus } from "../status.js";
-import { buildTask, flattenTask } from "../taskHelpers.js";
+import { buildTask, flattenTask, clampFutureDeadline } from "../taskHelpers.js";
+import { onlyDigits } from "../phone.js";
+
+function ownerIdForPhone(db, phone) {
+  const digits = onlyDigits(phone);
+  if (!digits) return null;
+  const match = db.responsibles.find((r) => onlyDigits(r.phone) === digits);
+  return match ? match.id : null;
+}
 
 export const tasksRouter = Router();
 
@@ -11,13 +19,21 @@ function projectSummary(project) {
   return { id: project.id, clientName: project.clientName, clientType: project.clientType };
 }
 
-// GET /api/tasks?projectId=&status=&overdue=true&dueOn=YYYY-MM-DD&dueBefore=&dueAfter=
+// GET /api/tasks?projectId=&status=&overdue=true&dueOn=YYYY-MM-DD&dueBefore=&dueAfter=&phone=
+// "phone" (usado pelo agente do WhatsApp) restringe o resultado às tarefas de
+// projetos cujo dono é o responsável cadastrado nesse telefone — mesma regra
+// de GET /api/projects.
 tasksRouter.get("/", async (req, res) => {
-  const { projectId, status, overdue, dueOn, dueBefore, dueAfter } = req.query;
+  const { projectId, status, overdue, dueOn, dueBefore, dueAfter, phone } = req.query;
   const today = todayISO();
 
   const db = await readOnly((db) => db);
-  let tasks = db.projects.flatMap((p) => p.tasks.map((t) => flattenTask(p, t, db.responsibles)));
+  let projects = db.projects;
+  if (phone) {
+    const ownerId = ownerIdForPhone(db, phone);
+    projects = ownerId ? projects.filter((p) => p.ownerResponsibleId === ownerId) : [];
+  }
+  let tasks = projects.flatMap((p) => p.tasks.map((t) => flattenTask(p, t, db.responsibles)));
 
   if (projectId) tasks = tasks.filter((t) => t.projectId === projectId);
   if (status) tasks = tasks.filter((t) => t.status === status);
@@ -76,7 +92,9 @@ tasksRouter.patch("/:id", async (req, res) => {
       const wasCompleted = task.status === "Concluído";
       for (const key of allowed) {
         if (req.body && key in req.body) {
-          task[key] = key === "status" ? normalizeStatus(req.body[key], TASK_STATUSES) : req.body[key];
+          if (key === "status") task[key] = normalizeStatus(req.body[key], TASK_STATUSES);
+          else if (key === "deadline") task[key] = clampFutureDeadline(String(req.body[key]));
+          else task[key] = req.body[key];
         }
       }
       if (req.body?.responsibleId && !("responsible" in (req.body || {}))) {

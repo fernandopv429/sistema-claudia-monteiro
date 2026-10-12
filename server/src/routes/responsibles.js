@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { withDb, readOnly, nextId } from "../db.js";
+import { onlyDigits } from "../phone.js";
 
 export const responsiblesRouter = Router();
 
@@ -7,10 +8,6 @@ export const responsiblesRouter = Router();
 responsiblesRouter.get("/", async (req, res) => {
   res.json(await readOnly((db) => db.responsibles));
 });
-
-function onlyDigits(s) {
-  return String(s || "").replace(/\D/g, "");
-}
 
 // GET /api/responsibles/check?phone=5511999999999
 // Usado pelo agente do WhatsApp pra só responder gente cadastrada. Compara
