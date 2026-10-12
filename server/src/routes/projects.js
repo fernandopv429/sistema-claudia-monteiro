@@ -38,13 +38,15 @@ projectsRouter.get("/:id", async (req, res) => {
   res.json(project);
 });
 
-// POST /api/projects { clientName, clientType?, responsible?, contactEmail?, startDate?, ownerResponsibleId? }
+// POST /api/projects { clientName, clientType?, responsible?, contactEmail?, startDate?, ownerResponsibleId?, notes?, meetingLink? }
 // "responsible" é o contato do lado do cliente (texto livre, ex: "Dra. Fernanda").
 // "ownerResponsibleId" é quem, do seu time, é dono desse projeto — é o que
 // decide quais projetos aparecem pra essa pessoa quando ela fala com o agente
 // pelo WhatsApp (veja GET acima).
+// "notes"/"meetingLink" existem pra quando o projeto nasce a partir de uma nota
+// de reunião do Meet (resumo e link da nota, pra não perder esse contexto).
 projectsRouter.post("/", async (req, res) => {
-  const { clientName, clientType, responsible, contactEmail, startDate, ownerResponsibleId } = req.body || {};
+  const { clientName, clientType, responsible, contactEmail, startDate, ownerResponsibleId, notes, meetingLink } = req.body || {};
   if (!clientName || !clientName.trim()) {
     return res.status(400).json({ error: "clientName é obrigatório" });
   }
@@ -55,6 +57,8 @@ projectsRouter.post("/", async (req, res) => {
       { nextId: (prefix) => nextId(db, prefix), todayISO }
     );
     built.ownerResponsibleId = ownerResponsibleId || null;
+    built.notes = notes || "";
+    built.meetingLink = meetingLink || "";
     db.projects.unshift(built);
     return built;
   });
@@ -71,7 +75,7 @@ projectsRouter.post("/", async (req, res) => {
 });
 
 projectsRouter.patch("/:id", async (req, res) => {
-  const allowed = ["clientName", "clientType", "responsible", "contactEmail", "status", "startDate", "deadline", "ownerResponsibleId"];
+  const allowed = ["clientName", "clientType", "responsible", "contactEmail", "status", "startDate", "deadline", "ownerResponsibleId", "notes", "meetingLink"];
   const updated = await withDb((db) => {
     const project = db.projects.find((p) => p.id === req.params.id);
     if (!project) return null;

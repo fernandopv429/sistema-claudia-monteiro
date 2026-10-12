@@ -44,7 +44,7 @@ function matchProjectByClientName(projects, title, content) {
 // com a mesma sourceUrl, devolve ela em vez de criar outra (e não tenta criar
 // tarefa de novo).
 meetingNotesRouter.post("/", async (req, res) => {
-  const { title, content, sourceUrl, meetingDate, actionItems } = req.body || {};
+  const { title, content, sourceUrl, meetingDate, actionItems, summary } = req.body || {};
   if (!title || !content) {
     return res.status(400).json({ error: "title e content são obrigatórios" });
   }
@@ -74,6 +74,7 @@ meetingNotesRouter.post("/", async (req, res) => {
       content: String(content),
       sourceUrl: sourceUrl || null,
       meetingDate: meetingDate || null,
+      summary: summary || "",
       actionItems: items,
       projectId: matched ? matched.id : null,
       status: matched && createdTasks.length ? "Vinculada" : "Pendente", // Pendente | Vinculada | Descartada

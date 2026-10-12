@@ -95,6 +95,24 @@ export default function ProjectDetail({ projects, refresh }) {
         </select>
       </div>
 
+      {(project.notes || project.meetingLink) && (
+        <div className="bg-white rounded-2xl border border-slate-200 p-5 mb-6">
+          {project.meetingLink && (
+            <a
+              href={project.meetingLink}
+              target="_blank"
+              rel="noreferrer"
+              className="text-xs text-brand-600 hover:underline break-all"
+            >
+              {project.meetingLink}
+            </a>
+          )}
+          {project.notes && (
+            <p className="text-sm text-slate-600 whitespace-pre-wrap mt-2">{project.notes}</p>
+          )}
+        </div>
+      )}
+
       <div className="bg-white rounded-2xl border border-slate-200 p-5 mb-8">
         <div className="flex items-center justify-between mb-2">
           <span className="text-sm font-medium text-slate-600">Progresso geral</span>

@@ -3,7 +3,7 @@ import { X } from "lucide-react";
 import { todayISO } from "../lib/dates";
 import { listResponsibles } from "../lib/api";
 
-export default function NewProjectModal({ onClose, onCreate, saving, initialClientName = "" }) {
+export default function NewProjectModal({ onClose, onCreate, saving, initialClientName = "", initialNotes = "", initialMeetingLink = "" }) {
   const [form, setForm] = useState({
     clientName: initialClientName,
     clientType: "Clínica",
@@ -11,6 +11,8 @@ export default function NewProjectModal({ onClose, onCreate, saving, initialClie
     contactEmail: "",
     startDate: todayISO(),
     ownerResponsibleId: "",
+    notes: initialNotes,
+    meetingLink: initialMeetingLink,
   });
   const [responsibles, setResponsibles] = useState([]);
 
@@ -99,6 +101,25 @@ export default function NewProjectModal({ onClose, onCreate, saving, initialClie
             <p className="text-xs text-slate-400 mt-1">
               Quando essa pessoa falar com o agente pelo WhatsApp, só vê os projetos que são dela.
             </p>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Link da reunião / nota</label>
+            <input
+              value={form.meetingLink}
+              onChange={(e) => update("meetingLink", e.target.value)}
+              placeholder="opcional"
+              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-400"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Notas / resumo</label>
+            <textarea
+              value={form.notes}
+              onChange={(e) => update("notes", e.target.value)}
+              placeholder="opcional"
+              rows={4}
+              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-400"
+            />
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">E-mail de contato</label>
