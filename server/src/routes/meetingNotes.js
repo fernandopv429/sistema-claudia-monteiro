@@ -1,48 +1,83 @@
 import { Router } from "express";
 import { withDb, readOnly, nextId } from "../db.js";
+import { buildTask, flattenTask } from "../taskHelpers.js";
+import { todayISO, addDays } from "../dates.js";
+import { emitEvent } from "../events.js";
 
 export const meetingNotesRouter = Router();
 
+// Tenta achar, entre os projetos cadastrados, um cujo nome de cliente apareça
+// no título ou no conteúdo da reunião (case-insensitive). Sem acerto, null —
+// a reunião fica na caixa de entrada pra alguém vincular manualmente, em vez
+// de arriscar criar tarefa no cliente errado.
+function matchProjectByClientName(projects, title, content) {
+  const haystack = `${title} ${content}`.toLowerCase();
+  return projects.find((p) => p.clientName && haystack.includes(p.clientName.toLowerCase())) || null;
+}
+
 // Caixa de entrada de notas de reunião (ex: geradas pelo Gemini no Meet,
-// capturadas pelo n8n). Ficam "soltas" aqui até alguém revisar e vincular a
-// um projeto — não tentamos adivinhar automaticamente de qual cliente é a
-// reunião, pra não criar tarefa no lugar errado.
+// capturadas pelo n8n). Quando dá pra casar o cliente pelo nome, os
+// actionItems já viram tarefas reais no projeto (sem responsável definido —
+// vem de transcrição, não dá pra confiar cegamente em quem a IA apontou —
+// e marcadas com source:"meet" pra aparecer identificadas no painel). Sem
+// acerto, a nota fica "Pendente" pra alguém vincular manualmente.
 //
 // POST /api/meeting-notes { title, content, sourceUrl?, meetingDate?, actionItems? }
 // actionItems: [{ responsible, title, description }] — extraído da seção
-// "Próximas etapas" das notas do Gemini (formato "[Responsável] Título: Descrição"),
-// cada item ainda precisa virar tarefa manualmente via POST /api/tasks.
+// "Próximas etapas" das notas do Gemini (formato "[Responsável] Título: Descrição").
 //
 // Idempotente por sourceUrl: quem alimenta isso (ex: n8n) pode rodar em
 // varredura periódica sem se preocupar em duplicar — se já existe uma nota
-// com a mesma sourceUrl, devolve ela em vez de criar outra.
+// com a mesma sourceUrl, devolve ela em vez de criar outra (e não tenta criar
+// tarefa de novo).
 meetingNotesRouter.post("/", async (req, res) => {
   const { title, content, sourceUrl, meetingDate, actionItems } = req.body || {};
   if (!title || !content) {
     return res.status(400).json({ error: "title e content são obrigatórios" });
   }
 
-  const { note, existed } = await withDb((db) => {
+  const { note, existed, createdTasks, project } = await withDb((db) => {
     if (sourceUrl) {
       const found = db.meetingNotes.find((n) => n.sourceUrl === sourceUrl);
-      if (found) return { note: found, existed: true };
+      if (found) return { note: found, existed: true, createdTasks: [], project: null };
     }
+
+    const items = Array.isArray(actionItems) ? actionItems : [];
+    const matched = matchProjectByClientName(db.projects, title, content);
+    const createdTasks = [];
+    if (matched && items.length) {
+      const deadline = addDays(todayISO(), 3);
+      for (const item of items) {
+        const taskTitle = item.description ? `${item.title}: ${item.description}` : item.title;
+        if (!taskTitle) continue;
+        const task = buildTask(db, matched, { title: taskTitle, deadline, source: "meet" });
+        if (task) createdTasks.push(flattenTask(matched, task, db.responsibles));
+      }
+    }
+
     const n = {
       id: nextId(db, "note"),
       title: String(title),
       content: String(content),
       sourceUrl: sourceUrl || null,
       meetingDate: meetingDate || null,
-      actionItems: Array.isArray(actionItems) ? actionItems : [],
-      projectId: null,
-      status: "Pendente", // Pendente | Vinculada | Descartada
+      actionItems: items,
+      projectId: matched ? matched.id : null,
+      status: matched && createdTasks.length ? "Vinculada" : "Pendente", // Pendente | Vinculada | Descartada
       receivedAt: new Date().toISOString(),
     };
     db.meetingNotes.unshift(n);
-    return { note: n, existed: false };
+    return { note: n, existed: false, createdTasks, project: matched };
   });
 
   res.status(existed ? 200 : 201).json(note);
+
+  if (project) {
+    const projectSummary = { id: project.id, clientName: project.clientName, clientType: project.clientType };
+    for (const task of createdTasks) {
+      emitEvent("task.created", { task, project: projectSummary }).catch(() => {});
+    }
+  }
 });
 
 meetingNotesRouter.get("/", async (req, res) => {

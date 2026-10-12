@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, CheckCircle2, Circle, Plus, Check } from "lucide-react";
 import ProgressBar from "../components/ProgressBar";
-import { StatusPill } from "../components/Badges";
+import { StatusPill, MeetTag } from "../components/Badges";
 import { computeProgress, currentPhase } from "../lib/store";
 import { updateTask, createTask, updateProject as apiUpdateProject, listResponsibles } from "../lib/api";
 import { formatDatePT, isOverdue, todayISO } from "../lib/dates";
@@ -157,8 +157,9 @@ export default function ProjectDetail({ projects, refresh }) {
                           <Circle size={20} />
                         )}
                       </button>
-                      <div className={`flex-1 min-w-0 truncate text-sm ${task.status === "Concluído" ? "line-through text-slate-400" : "text-ink-900"}`}>
-                        {task.title}
+                      <div className={`flex-1 min-w-0 flex items-center gap-1.5 truncate text-sm ${task.status === "Concluído" ? "line-through text-slate-400" : "text-ink-900"}`}>
+                        <span className="truncate">{task.title}</span>
+                        {task.source === "meet" && <MeetTag />}
                       </div>
                       <div className="hidden sm:block text-xs text-slate-400 whitespace-nowrap">{task.responsible}</div>
                       <input

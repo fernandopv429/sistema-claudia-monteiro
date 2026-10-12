@@ -1,33 +1,14 @@
 import { Router } from "express";
-import { withDb, readOnly, nextId } from "../db.js";
+import { withDb, readOnly } from "../db.js";
 import { todayISO } from "../dates.js";
 import { emitEvent } from "../events.js";
 import { TASK_STATUSES, normalizeStatus } from "../status.js";
+import { buildTask, flattenTask } from "../taskHelpers.js";
 
 export const tasksRouter = Router();
 
-function currentPhaseOf(project) {
-  for (const phase of project.phases) {
-    const phaseTasks = project.tasks.filter((t) => t.phaseId === phase.id);
-    const allDone = phaseTasks.length > 0 && phaseTasks.every((t) => t.status === "Concluído");
-    if (!allDone) return phase;
-  }
-  return project.phases[project.phases.length - 1];
-}
-
 function projectSummary(project) {
   return { id: project.id, clientName: project.clientName, clientType: project.clientType };
-}
-
-function flatten(project, task, responsibles = []) {
-  const resp = task.responsibleId ? responsibles.find((r) => r.id === task.responsibleId) : null;
-  return {
-    ...task,
-    projectId: project.id,
-    projectName: project.clientName,
-    projectStatus: project.status,
-    responsiblePhone: resp ? resp.phone : null,
-  };
 }
 
 // GET /api/tasks?projectId=&status=&overdue=true&dueOn=YYYY-MM-DD&dueBefore=&dueAfter=
@@ -36,7 +17,7 @@ tasksRouter.get("/", async (req, res) => {
   const today = todayISO();
 
   const db = await readOnly((db) => db);
-  let tasks = db.projects.flatMap((p) => p.tasks.map((t) => flatten(p, t, db.responsibles)));
+  let tasks = db.projects.flatMap((p) => p.tasks.map((t) => flattenTask(p, t, db.responsibles)));
 
   if (projectId) tasks = tasks.filter((t) => t.projectId === projectId);
   if (status) tasks = tasks.filter((t) => t.status === status);
@@ -53,7 +34,7 @@ tasksRouter.get("/:id", async (req, res) => {
   const db = await readOnly((db) => db);
   for (const project of db.projects) {
     const task = project.tasks.find((t) => t.id === req.params.id);
-    if (task) return res.json(flatten(project, task, db.responsibles));
+    if (task) return res.json(flattenTask(project, task, db.responsibles));
   }
   res.status(404).json({ error: "Tarefa não encontrada" });
 });
@@ -73,26 +54,10 @@ tasksRouter.post("/", async (req, res) => {
     const project = db.projects.find((p) => p.id === projectId);
     if (!project) return { error: "Projeto não encontrado", code: 404 };
 
-    let phase = null;
-    if (phaseId) phase = project.phases.find((p) => p.id === phaseId);
-    else if (phaseName) phase = project.phases.find((p) => p.name === phaseName);
-    if (!phase) phase = currentPhaseOf(project);
-    if (!phase) return { error: "Projeto não tem fases", code: 400 };
+    const task = buildTask(db, project, { title, deadline, responsible, responsibleId, status, phaseId, phaseName });
+    if (!task) return { error: "Projeto não tem fases", code: 400 };
 
-    const linkedResponsible = responsibleId ? db.responsibles.find((r) => r.id === responsibleId) : null;
-
-    const task = {
-      id: nextId(db, "task"),
-      phaseId: phase.id,
-      phaseName: phase.name,
-      title: String(title),
-      responsible: responsible || linkedResponsible?.name || "",
-      responsibleId: linkedResponsible ? linkedResponsible.id : null,
-      deadline: String(deadline),
-      status: status ? normalizeStatus(status, TASK_STATUSES) : "Pendente",
-    };
-    project.tasks.push(task);
-    return { task: flatten(project, task, db.responsibles), project };
+    return { task: flattenTask(project, task, db.responsibles), project };
   });
 
   if (result.error) return res.status(result.code).json({ error: result.error });
@@ -123,7 +88,7 @@ tasksRouter.patch("/:id", async (req, res) => {
         if (phase) task.phaseName = phase.name;
       }
       const justCompleted = !wasCompleted && task.status === "Concluído";
-      return { task: flatten(project, task, db.responsibles), project, justCompleted };
+      return { task: flattenTask(project, task, db.responsibles), project, justCompleted };
     }
     return null;
   });

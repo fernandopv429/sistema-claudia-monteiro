@@ -24,6 +24,17 @@ export function StatusPill({ status }) {
   );
 }
 
+export function MeetTag() {
+  return (
+    <span
+      className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-violet-50 text-violet-600 border border-violet-100"
+      title="Criada automaticamente a partir de uma nota de reunião do Meet"
+    >
+      Meet
+    </span>
+  );
+}
+
 export function OverdueTag({ count }) {
   if (!count) return null;
   return (
