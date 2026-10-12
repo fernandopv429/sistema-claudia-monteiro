@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
-import { FileText, Link2, X } from "lucide-react";
-import { listMeetingNotes, updateMeetingNote } from "../lib/api";
+import { FileText, Link2, Plus, X } from "lucide-react";
+import { listMeetingNotes, updateMeetingNote, createProject } from "../lib/api";
+import NewProjectModal from "./NewProjectModal";
 
 export default function MeetingNotesInbox({ projects, onLinked }) {
   const [notes, setNotes] = useState([]);
   const [selected, setSelected] = useState({});
   const [busy, setBusy] = useState(null);
+  const [creatingFor, setCreatingFor] = useState(null);
 
   function refresh() {
     return listMeetingNotes({ status: "Pendente" }).then(setNotes).catch(() => {});
@@ -38,7 +40,24 @@ export default function MeetingNotesInbox({ projects, onLinked }) {
     }
   }
 
+  async function createAndLink(form) {
+    const note = notes.find((n) => n.id === creatingFor);
+    if (!note) return;
+    setBusy(note.id);
+    try {
+      const project = await createProject(form);
+      await updateMeetingNote(note.id, { projectId: project.id, status: "Vinculada" });
+      setCreatingFor(null);
+      await refresh();
+      await onLinked?.();
+    } finally {
+      setBusy(null);
+    }
+  }
+
   if (notes.length === 0) return null;
+
+  const creatingNote = notes.find((n) => n.id === creatingFor);
 
   return (
     <div className="mb-6">
@@ -57,7 +76,7 @@ export default function MeetingNotesInbox({ projects, onLinked }) {
                 onChange={(e) => setSelected((s) => ({ ...s, [note.id]: e.target.value }))}
                 className="text-xs border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-400"
               >
-                <option value="">Vincular a um projeto...</option>
+                <option value="">Vincular a um projeto existente...</option>
                 {projects.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.clientName}
@@ -72,6 +91,13 @@ export default function MeetingNotesInbox({ projects, onLinked }) {
                 <Link2 size={12} /> Vincular
               </button>
               <button
+                onClick={() => setCreatingFor(note.id)}
+                disabled={busy === note.id}
+                className="flex items-center gap-1 text-xs font-medium text-brand-600 hover:bg-brand-50 px-3 py-1.5 rounded-lg border border-brand-200"
+              >
+                <Plus size={12} /> Criar projeto novo
+              </button>
+              <button
                 onClick={() => discard(note.id)}
                 disabled={busy === note.id}
                 className="flex items-center gap-1 text-xs text-slate-400 hover:text-rose-600 px-2 py-1.5"
@@ -82,6 +108,15 @@ export default function MeetingNotesInbox({ projects, onLinked }) {
           </div>
         ))}
       </div>
+
+      {creatingNote && (
+        <NewProjectModal
+          initialClientName={creatingNote.title}
+          saving={busy === creatingNote.id}
+          onClose={() => setCreatingFor(null)}
+          onCreate={createAndLink}
+        />
+      )}
     </div>
   );
 }

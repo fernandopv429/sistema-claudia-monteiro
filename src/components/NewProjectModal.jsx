@@ -3,9 +3,9 @@ import { X } from "lucide-react";
 import { todayISO } from "../lib/dates";
 import { listResponsibles } from "../lib/api";
 
-export default function NewProjectModal({ onClose, onCreate, saving }) {
+export default function NewProjectModal({ onClose, onCreate, saving, initialClientName = "" }) {
   const [form, setForm] = useState({
-    clientName: "",
+    clientName: initialClientName,
     clientType: "Clínica",
     responsible: "",
     contactEmail: "",
