@@ -6,13 +6,26 @@ import { emitEvent } from "../events.js";
 
 export const meetingNotesRouter = Router();
 
+function escapeRegExp(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 // Tenta achar, entre os projetos cadastrados, um cujo nome de cliente apareça
-// no título ou no conteúdo da reunião (case-insensitive). Sem acerto, null —
-// a reunião fica na caixa de entrada pra alguém vincular manualmente, em vez
-// de arriscar criar tarefa no cliente errado.
+// no título ou no conteúdo da reunião (case-insensitive, respeitando borda de
+// palavra pra "ass" não bater com "assinar" — e ignorando nomes curtos demais
+// pra isso fazer sentido). Sem acerto, null — a reunião fica na caixa de
+// entrada pra alguém vincular manualmente, em vez de arriscar criar tarefa no
+// cliente errado.
 function matchProjectByClientName(projects, title, content) {
-  const haystack = `${title} ${content}`.toLowerCase();
-  return projects.find((p) => p.clientName && haystack.includes(p.clientName.toLowerCase())) || null;
+  const haystack = `${title} ${content}`;
+  return (
+    projects.find((p) => {
+      const name = p.clientName?.trim();
+      if (!name || name.length < 4) return false;
+      const re = new RegExp(`\\b${escapeRegExp(name)}\\b`, "i");
+      return re.test(haystack);
+    }) || null
+  );
 }
 
 // Caixa de entrada de notas de reunião (ex: geradas pelo Gemini no Meet,
