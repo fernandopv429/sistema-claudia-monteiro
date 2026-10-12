@@ -8,6 +8,22 @@ responsiblesRouter.get("/", async (req, res) => {
   res.json(await readOnly((db) => db.responsibles));
 });
 
+function onlyDigits(s) {
+  return String(s || "").replace(/\D/g, "");
+}
+
+// GET /api/responsibles/check?phone=5511999999999
+// Usado pelo agente do WhatsApp pra só responder gente cadastrada. Compara
+// só os dígitos, pra não quebrar por causa de "+", espaço ou traço.
+responsiblesRouter.get("/check", async (req, res) => {
+  const phone = onlyDigits(req.query.phone);
+  if (!phone) return res.status(400).json({ error: "phone é obrigatório" });
+
+  const responsibles = await readOnly((db) => db.responsibles);
+  const match = responsibles.find((r) => onlyDigits(r.phone) === phone);
+  res.json({ registered: !!match, responsible: match || null });
+});
+
 // POST /api/responsibles { name, phone }
 // phone é o número usado pelo WhatsApp (Evolution API) pra notificar essa
 // pessoa quando uma tarefa dela estiver perto do prazo, atrasada, etc.
