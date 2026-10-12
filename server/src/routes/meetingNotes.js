@@ -64,6 +64,7 @@ meetingNotesRouter.post("/", async (req, res) => {
       actionItems: items,
       projectId: matched ? matched.id : null,
       status: matched && createdTasks.length ? "Vinculada" : "Pendente", // Pendente | Vinculada | Descartada
+      tasksCreated: Boolean(matched && createdTasks.length),
       receivedAt: new Date().toISOString(),
     };
     db.meetingNotes.unshift(n);
@@ -93,18 +94,44 @@ meetingNotesRouter.get("/:id", async (req, res) => {
   res.json(note);
 });
 
-// Vincula a nota a um projeto existente (só marca a nota — criar tarefas a
-// partir do conteúdo continua sendo uma decisão humana via POST /api/tasks).
+// Vincula a nota a um projeto (manualmente, pela caixa de entrada no
+// Dashboard). Se a nota tiver actionItems e ainda não tiver gerado tarefas,
+// cria elas no projeto agora — mesma regra do match automático (sem
+// responsável, tag source:"meet"). tasksCreated evita duplicar se a nota for
+// vinculada de novo depois.
 meetingNotesRouter.patch("/:id", async (req, res) => {
   const allowed = ["status", "projectId"];
-  const updated = await withDb((db) => {
+  const result = await withDb((db) => {
     const note = db.meetingNotes.find((n) => n.id === req.params.id);
     if (!note) return null;
     for (const key of allowed) {
       if (req.body && key in req.body) note[key] = req.body[key];
     }
-    return note;
+
+    let createdTasks = [];
+    let project = null;
+    if (req.body?.projectId && !note.tasksCreated) {
+      project = db.projects.find((p) => p.id === req.body.projectId);
+      if (project && note.actionItems?.length) {
+        const deadline = addDays(todayISO(), 3);
+        for (const item of note.actionItems) {
+          const taskTitle = item.description ? `${item.title}: ${item.description}` : item.title;
+          if (!taskTitle) continue;
+          const task = buildTask(db, project, { title: taskTitle, deadline, source: "meet" });
+          if (task) createdTasks.push(flattenTask(project, task, db.responsibles));
+        }
+        note.tasksCreated = true;
+      }
+    }
+    return { note, createdTasks, project };
   });
-  if (!updated) return res.status(404).json({ error: "Nota não encontrada" });
-  res.json(updated);
+  if (!result) return res.status(404).json({ error: "Nota não encontrada" });
+  res.json(result.note);
+
+  if (result.project && result.createdTasks.length) {
+    const projectSummary = { id: result.project.id, clientName: result.project.clientName, clientType: result.project.clientType };
+    for (const task of result.createdTasks) {
+      emitEvent("task.created", { task, project: projectSummary }).catch(() => {});
+    }
+  }
 });

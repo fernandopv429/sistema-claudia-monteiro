@@ -77,3 +77,12 @@ export function updateResponsible(id, patch) {
 export function deleteResponsible(id) {
   return request(`/responsibles/${id}`, { method: "DELETE" });
 }
+
+export function listMeetingNotes(params = {}) {
+  const qs = new URLSearchParams(params).toString();
+  return request(`/meeting-notes${qs ? `?${qs}` : ""}`);
+}
+
+export function updateMeetingNote(id, patch) {
+  return request(`/meeting-notes/${id}`, { method: "PATCH", body: JSON.stringify(patch) });
+}

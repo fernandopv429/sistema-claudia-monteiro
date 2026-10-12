@@ -4,6 +4,7 @@ import { Plus } from "lucide-react";
 import ProgressBar from "../components/ProgressBar";
 import { PhaseBadge, OverdueTag, StatusPill } from "../components/Badges";
 import NewProjectModal from "../components/NewProjectModal";
+import MeetingNotesInbox from "../components/MeetingNotesInbox";
 import { computeProgress, currentPhase, overdueCount } from "../lib/store";
 import { createProject } from "../lib/api";
 import { formatDatePT } from "../lib/dates";
@@ -53,6 +54,8 @@ export default function Dashboard({ projects, refresh }) {
           Novo projeto
         </button>
       </div>
+
+      <MeetingNotesInbox projects={projects} onLinked={refresh} />
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
         {projects.map((project) => {
