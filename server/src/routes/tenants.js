@@ -1,0 +1,97 @@
+import { Router } from "express";
+import crypto from "node:crypto";
+import { withTenants, withDb, readTenants } from "../db.js";
+import { requireSuperAdmin } from "../tenantAuth.js";
+import { provisionInstance, deleteInstance, fetchQrCode, fetchConnectionState } from "../evolution.js";
+
+export const tenantsRouter = Router();
+
+// Tudo aqui exige a chave de dono da plataforma (SUPER_ADMIN_KEY), não a
+// chave de um tenant — isso é gerenciamento de clientes, não uso do painel.
+tenantsRouter.use(requireSuperAdmin);
+
+tenantsRouter.get("/", async (req, res) => {
+  const tenants = await readTenants();
+  // não devolve a apiKey na listagem, só quando criado
+  res.json(tenants.map(({ apiKey, ...t }) => t));
+});
+
+// POST /api/tenants { name }
+// Cria um cliente novo com uma chave de acesso nova (login no painel, header
+// X-Tenant-Key) e já provisiona pra ele uma instância própria de WhatsApp na
+// Evolution API — é o número que vai mandar lembretes e receber comandos
+// desse cliente, separado do de qualquer outro.
+tenantsRouter.post("/", async (req, res) => {
+  const { name } = req.body || {};
+  if (!name || !name.trim()) return res.status(400).json({ error: "name é obrigatório" });
+
+  const apiKey = "tn_" + crypto.randomBytes(24).toString("hex");
+  const tenant = await withTenants((registry) => {
+    const id = `tenant_${Date.now().toString(36)}_${registry.idCounter}`;
+    registry.idCounter += 1;
+    const t = { id, name: name.trim(), apiKey, evolutionInstance: id, createdAt: new Date().toISOString() };
+    registry.tenants.push(t);
+    return t;
+  });
+
+  // já inicializa a linha de dados desse tenant, pra não depender de uma
+  // escrita concorrente criar ela depois.
+  await withDb(tenant.id, () => {});
+
+  try {
+    await provisionInstance(tenant.evolutionInstance);
+  } catch (err) {
+    // não deixa um tenant "pela metade" sem WhatsApp próprio — desfaz o
+    // cadastro e devolve o erro pra tentar de novo.
+    await withTenants((registry) => {
+      registry.tenants = registry.tenants.filter((t) => t.id !== tenant.id);
+    });
+    return res.status(502).json({ error: `Falhou ao provisionar o WhatsApp do cliente: ${err.message}` });
+  }
+
+  res.status(201).json(tenant);
+});
+
+// GET /api/tenants/:id/qrcode — QR code pra parear o WhatsApp desse cliente.
+// Chamar de novo se o cliente demorar e o QR expirar.
+tenantsRouter.get("/:id/qrcode", async (req, res) => {
+  const tenants = await readTenants();
+  const tenant = tenants.find((t) => t.id === req.params.id);
+  if (!tenant) return res.status(404).json({ error: "Tenant não encontrado" });
+  try {
+    res.json(await fetchQrCode(tenant.evolutionInstance));
+  } catch (err) {
+    res.status(502).json({ error: err.message });
+  }
+});
+
+// GET /api/tenants/:id/status — "open" (pareado e conectado), "close"
+// (esperando parear ou caiu), "connecting".
+tenantsRouter.get("/:id/status", async (req, res) => {
+  const tenants = await readTenants();
+  const tenant = tenants.find((t) => t.id === req.params.id);
+  if (!tenant) return res.status(404).json({ error: "Tenant não encontrado" });
+  try {
+    res.json({ state: await fetchConnectionState(tenant.evolutionInstance) });
+  } catch (err) {
+    res.status(502).json({ error: err.message });
+  }
+});
+
+tenantsRouter.delete("/:id", async (req, res) => {
+  const tenants = await readTenants();
+  const tenant = tenants.find((t) => t.id === req.params.id);
+  if (!tenant) return res.status(404).json({ error: "Tenant não encontrado" });
+
+  await withTenants((registry) => {
+    registry.tenants = registry.tenants.filter((t) => t.id !== req.params.id);
+  });
+
+  if (tenant.evolutionInstance) {
+    await deleteInstance(tenant.evolutionInstance).catch((err) =>
+      console.error(`Falha ao apagar instância Evolution "${tenant.evolutionInstance}":`, err.message)
+    );
+  }
+
+  res.status(204).end();
+});

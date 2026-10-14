@@ -20,7 +20,7 @@ tasksRouter.get("/", async (req, res) => {
   const { projectId, status, overdue, dueOn, dueBefore, dueAfter, phone } = req.query;
   const today = todayISO();
 
-  const db = await readOnly((db) => db);
+  const db = await readOnly(req.tenantId, (db) => db);
   const projects = phone ? projectsVisibleToPhone(db, phone) : db.projects;
   let tasks = projects.flatMap((p) => p.tasks.map((t) => flattenTask(p, t, db.responsibles)));
 
@@ -36,7 +36,7 @@ tasksRouter.get("/", async (req, res) => {
 });
 
 tasksRouter.get("/:id", async (req, res) => {
-  const db = await readOnly((db) => db);
+  const db = await readOnly(req.tenantId, (db) => db);
   for (const project of db.projects) {
     const task = project.tasks.find((t) => t.id === req.params.id);
     if (task) return res.json(flattenTask(project, task, db.responsibles));
@@ -55,7 +55,7 @@ tasksRouter.post("/", async (req, res) => {
     return res.status(400).json({ error: "projectId, title e deadline são obrigatórios" });
   }
 
-  const result = await withDb((db) => {
+  const result = await withDb(req.tenantId, (db) => {
     const project = db.projects.find((p) => p.id === projectId);
     if (!project) return { error: "Projeto não encontrado", code: 404 };
 
@@ -68,13 +68,13 @@ tasksRouter.post("/", async (req, res) => {
   if (result.error) return res.status(result.code).json({ error: result.error });
   res.status(201).json(result.task);
 
-  emitEvent("task.created", { task: result.task, project: projectSummary(result.project) }).catch(() => {});
+  emitEvent(req.tenantId, "task.created", { task: result.task, project: projectSummary(result.project) }).catch(() => {});
 });
 
 // PATCH /api/tasks/:id { title?, responsible?, responsibleId?, deadline?, status?, phaseId? }
 tasksRouter.patch("/:id", async (req, res) => {
   const allowed = ["title", "responsible", "responsibleId", "deadline", "status", "phaseId"];
-  const result = await withDb((db) => {
+  const result = await withDb(req.tenantId, (db) => {
     for (const project of db.projects) {
       const task = project.tasks.find((t) => t.id === req.params.id);
       if (!task) continue;
@@ -103,6 +103,6 @@ tasksRouter.patch("/:id", async (req, res) => {
   res.json(result.task);
 
   if (result.justCompleted) {
-    emitEvent("task.completed", { task: result.task, project: projectSummary(result.project) }).catch(() => {});
+    emitEvent(req.tenantId, "task.completed", { task: result.task, project: projectSummary(result.project) }).catch(() => {});
   }
 });

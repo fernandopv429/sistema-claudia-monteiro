@@ -5,7 +5,7 @@ import { checkDueSoonAndNotify, sendWebhook } from "../scheduler.js";
 export const webhooksRouter = Router();
 
 webhooksRouter.get("/", async (req, res) => {
-  res.json(await readOnly((db) => db.webhooks));
+  res.json(await readOnly(req.tenantId, (db) => db.webhooks));
 });
 
 const EVENT_TYPES = ["task.created", "task.due_soon", "task.overdue", "task.completed"];
@@ -23,7 +23,7 @@ webhooksRouter.post("/", async (req, res) => {
   if (events && (!Array.isArray(events) || events.some((e) => !EVENT_TYPES.includes(e)))) {
     return res.status(400).json({ error: `events deve ser um array com valores entre: ${EVENT_TYPES.join(", ")}` });
   }
-  const webhook = await withDb((db) => {
+  const webhook = await withDb(req.tenantId, (db) => {
     const wh = {
       id: nextId(db, "wh"),
       url,
@@ -40,7 +40,7 @@ webhooksRouter.post("/", async (req, res) => {
 
 webhooksRouter.patch("/:id", async (req, res) => {
   const allowed = ["url", "hoursBefore", "active", "events"];
-  const updated = await withDb((db) => {
+  const updated = await withDb(req.tenantId, (db) => {
     const wh = db.webhooks.find((w) => w.id === req.params.id);
     if (!wh) return null;
     for (const key of allowed) {
@@ -53,7 +53,7 @@ webhooksRouter.patch("/:id", async (req, res) => {
 });
 
 webhooksRouter.delete("/:id", async (req, res) => {
-  const existed = await withDb((db) => {
+  const existed = await withDb(req.tenantId, (db) => {
     const before = db.webhooks.length;
     db.webhooks = db.webhooks.filter((w) => w.id !== req.params.id);
     return db.webhooks.length < before;
@@ -66,7 +66,7 @@ webhooksRouter.delete("/:id", async (req, res) => {
 // sem precisar esperar um evento real. ?event=task.created|task.due_soon|
 // task.overdue|task.completed (padrão: task.due_soon).
 webhooksRouter.post("/:id/test", async (req, res) => {
-  const webhook = await readOnly((db) => db.webhooks.find((w) => w.id === req.params.id));
+  const webhook = await readOnly(req.tenantId, (db) => db.webhooks.find((w) => w.id === req.params.id));
   if (!webhook) return res.status(404).json({ error: "Webhook não encontrado" });
 
   const event = EVENT_TYPES.includes(req.query.event) ? req.query.event : "task.due_soon";

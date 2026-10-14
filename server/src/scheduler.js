@@ -1,4 +1,4 @@
-import { withDb } from "./db.js";
+import { withDb, readAllTenantData, readTenants } from "./db.js";
 import { hoursUntilDeadline } from "./dates.js";
 import { sendWebhook } from "./webhookClient.js";
 
@@ -10,74 +10,87 @@ function notificationKey(taskId, webhookId, deadline, eventType) {
   return `${taskId}::${webhookId}::${deadline}::${eventType}`;
 }
 
-// Percorre os webhooks ativos e, para cada um, avisa sobre tarefas não
-// concluídas cujo prazo esteja dentro da janela configurada. Dispara
-// "task.due_soon" enquanto o prazo ainda não passou e "task.overdue" assim
-// que passa — são eventos distintos, cada um só notifica uma vez por
-// (tarefa, webhook, prazo); se o prazo da tarefa mudar depois, volta a poder
-// notificar os dois de novo.
-export async function checkDueSoonAndNotify(log = console.log) {
-  const now = new Date();
+// Monta, pra um único tenant, a lista de avisos pendentes (tarefa, webhook)
+// dentro da janela configurada. Não escreve nada — só calcula.
+function pendingJobsFor(tenantId, db, now) {
   const jobs = [];
+  const sentKeys = new Set(db.notifications.map((n) => n.key));
+  const activeWebhooks = db.webhooks.filter((w) => w.active !== false);
+  if (!activeWebhooks.length) return jobs;
 
-  await withDb((db) => {
-    const sentKeys = new Set(db.notifications.map((n) => n.key));
-    const activeWebhooks = db.webhooks.filter((w) => w.active !== false);
-    if (!activeWebhooks.length) return;
+  for (const project of db.projects) {
+    for (const task of project.tasks) {
+      if (task.status === "Concluído") continue;
+      const hours = hoursUntilDeadline(task.deadline, now);
+      const eventType = hours < 0 ? "task.overdue" : "task.due_soon";
 
-    for (const project of db.projects) {
-      for (const task of project.tasks) {
-        if (task.status === "Concluído") continue;
-        const hours = hoursUntilDeadline(task.deadline, now);
-        const eventType = hours < 0 ? "task.overdue" : "task.due_soon";
+      for (const webhook of activeWebhooks) {
+        if (webhook.events && !webhook.events.includes(eventType)) continue;
+        const threshold = webhook.hoursBefore ?? 24;
+        if (hours > threshold) continue;
 
-        for (const webhook of activeWebhooks) {
-          if (webhook.events && !webhook.events.includes(eventType)) continue;
-          const threshold = webhook.hoursBefore ?? 24;
-          if (hours > threshold) continue;
+        const key = notificationKey(task.id, webhook.id, task.deadline, eventType);
+        if (sentKeys.has(key)) continue;
 
-          const key = notificationKey(task.id, webhook.id, task.deadline, eventType);
-          if (sentKeys.has(key)) continue;
-
-          jobs.push({
-            key,
-            webhook,
-            payload: {
-              event: eventType,
-              triggeredAt: now.toISOString(),
-              hoursUntilDue: Math.round(hours * 10) / 10,
-              task: {
-                id: task.id,
-                title: task.title,
-                phase: task.phaseName,
-                responsible: task.responsible,
-                responsiblePhone: task.responsibleId
-                  ? db.responsibles.find((r) => r.id === task.responsibleId)?.phone ?? null
-                  : null,
-                deadline: task.deadline,
-                status: task.status,
-              },
-              project: {
-                id: project.id,
-                clientName: project.clientName,
-                clientType: project.clientType,
-              },
+        jobs.push({
+          tenantId,
+          key,
+          webhook,
+          payload: {
+            event: eventType,
+            triggeredAt: now.toISOString(),
+            hoursUntilDue: Math.round(hours * 10) / 10,
+            task: {
+              id: task.id,
+              title: task.title,
+              phase: task.phaseName,
+              responsible: task.responsible,
+              responsiblePhone: task.responsibleId
+                ? db.responsibles.find((r) => r.id === task.responsibleId)?.phone ?? null
+                : null,
+              deadline: task.deadline,
+              status: task.status,
             },
-          });
-        }
+            project: {
+              id: project.id,
+              clientName: project.clientName,
+              clientType: project.clientType,
+            },
+          },
+        });
       }
     }
-  });
+  }
+  return jobs;
+}
+
+// Percorre TODOS os tenants e, dentro de cada um, os webhooks ativos,
+// avisando sobre tarefas não concluídas cujo prazo esteja dentro da janela
+// configurada. Dispara "task.due_soon" enquanto o prazo ainda não passou e
+// "task.overdue" assim que passa — são eventos distintos, cada um só
+// notifica uma vez por (tarefa, webhook, prazo); se o prazo da tarefa mudar
+// depois, volta a poder notificar os dois de novo.
+export async function checkDueSoonAndNotify(log = console.log) {
+  const now = new Date();
+  const [allTenants, tenants] = await Promise.all([readAllTenantData(), readTenants()]);
+  const instanceByTenant = new Map(tenants.map((t) => [t.id, t.evolutionInstance || null]));
+
+  const jobs = allTenants.flatMap(({ tenantId, db }) =>
+    pendingJobsFor(tenantId, db, now).map((job) => ({
+      ...job,
+      payload: { ...job.payload, evolutionInstance: instanceByTenant.get(tenantId) || null },
+    }))
+  );
 
   for (const job of jobs) {
     const result = await sendWebhook(job.webhook.url, job.payload);
     log(
-      `[webhook] ${job.payload.event} ${job.payload.task.title} -> ${job.webhook.url} :: ${result.ok ? "ok" : "falhou"}${
-        result.error ? ` (${result.error})` : ""
-      }`
+      `[webhook] (${job.tenantId}) ${job.payload.event} ${job.payload.task.title} -> ${job.webhook.url} :: ${
+        result.ok ? "ok" : "falhou"
+      }${result.error ? ` (${result.error})` : ""}`
     );
     if (result.ok) {
-      await withDb((db) => {
+      await withDb(job.tenantId, (db) => {
         db.notifications.push({ key: job.key, sentAt: new Date().toISOString() });
       });
     }

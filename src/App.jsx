@@ -2,13 +2,16 @@ import { useCallback, useEffect, useState } from "react";
 import { HashRouter, Routes, Route } from "react-router-dom";
 import { Menu, X } from "lucide-react";
 import Sidebar from "./components/Sidebar";
+import Login from "./components/Login";
 import Dashboard from "./pages/Dashboard";
 import Today from "./pages/Today";
 import ProjectDetail from "./pages/ProjectDetail";
 import Responsibles from "./pages/Responsibles";
 import { listProjects } from "./lib/api";
+import { getTenantKey, clearTenantKey } from "./lib/tenant";
 
 export default function App() {
+  const [loggedIn, setLoggedIn] = useState(() => Boolean(getTenantKey()));
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -24,13 +27,29 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (!loggedIn) return;
     refresh().finally(() => setLoading(false));
-  }, [refresh]);
+  }, [loggedIn, refresh]);
+
+  useEffect(() => {
+    const onUnauthorized = () => setLoggedIn(false);
+    window.addEventListener("painel:unauthorized", onUnauthorized);
+    return () => window.removeEventListener("painel:unauthorized", onUnauthorized);
+  }, []);
+
+  function handleLogout() {
+    clearTenantKey();
+    setLoggedIn(false);
+  }
+
+  if (!loggedIn) {
+    return <Login onSuccess={() => setLoggedIn(true)} />;
+  }
 
   return (
     <HashRouter>
       <div className="flex min-h-screen">
-        <Sidebar open={menuOpen} onNavigate={() => setMenuOpen(false)} />
+        <Sidebar open={menuOpen} onNavigate={() => setMenuOpen(false)} onLogout={handleLogout} />
         <div className="flex-1 min-w-0 flex flex-col">
           <div className="sm:hidden sticky top-0 z-30 flex items-center h-12 px-3 bg-white border-b border-slate-200">
             <button

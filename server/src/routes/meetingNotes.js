@@ -49,7 +49,7 @@ meetingNotesRouter.post("/", async (req, res) => {
     return res.status(400).json({ error: "title e content são obrigatórios" });
   }
 
-  const { note, existed, createdTasks, project } = await withDb((db) => {
+  const { note, existed, createdTasks, project } = await withDb(req.tenantId, (db) => {
     if (sourceUrl) {
       const found = db.meetingNotes.find((n) => n.sourceUrl === sourceUrl);
       if (found) return { note: found, existed: true, createdTasks: [], project: null };
@@ -90,20 +90,20 @@ meetingNotesRouter.post("/", async (req, res) => {
   if (project) {
     const projectSummary = { id: project.id, clientName: project.clientName, clientType: project.clientType };
     for (const task of createdTasks) {
-      emitEvent("task.created", { task, project: projectSummary }).catch(() => {});
+      emitEvent(req.tenantId, "task.created", { task, project: projectSummary }).catch(() => {});
     }
   }
 });
 
 meetingNotesRouter.get("/", async (req, res) => {
   const { status } = req.query;
-  let notes = await readOnly((db) => db.meetingNotes);
+  let notes = await readOnly(req.tenantId, (db) => db.meetingNotes);
   if (status) notes = notes.filter((n) => n.status === status);
   res.json(notes);
 });
 
 meetingNotesRouter.get("/:id", async (req, res) => {
-  const note = await readOnly((db) => db.meetingNotes.find((n) => n.id === req.params.id));
+  const note = await readOnly(req.tenantId, (db) => db.meetingNotes.find((n) => n.id === req.params.id));
   if (!note) return res.status(404).json({ error: "Nota não encontrada" });
   res.json(note);
 });
@@ -115,7 +115,7 @@ meetingNotesRouter.get("/:id", async (req, res) => {
 // vinculada de novo depois.
 meetingNotesRouter.patch("/:id", async (req, res) => {
   const allowed = ["status", "projectId"];
-  const result = await withDb((db) => {
+  const result = await withDb(req.tenantId, (db) => {
     const note = db.meetingNotes.find((n) => n.id === req.params.id);
     if (!note) return null;
     for (const key of allowed) {
@@ -145,7 +145,7 @@ meetingNotesRouter.patch("/:id", async (req, res) => {
   if (result.project && result.createdTasks.length) {
     const projectSummary = { id: result.project.id, clientName: result.project.clientName, clientType: result.project.clientType };
     for (const task of result.createdTasks) {
-      emitEvent("task.created", { task, project: projectSummary }).catch(() => {});
+      emitEvent(req.tenantId, "task.created", { task, project: projectSummary }).catch(() => {});
     }
   }
 });

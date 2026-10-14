@@ -15,13 +15,13 @@ export const projectsRouter = Router();
 // próprios se for um responsável comum, nada se o telefone não bater com
 // ninguém cadastrado.
 projectsRouter.get("/", async (req, res) => {
-  const db = await readOnly((db) => db);
+  const db = await readOnly(req.tenantId, (db) => db);
   const projects = req.query.phone ? projectsVisibleToPhone(db, req.query.phone) : db.projects;
   res.json(projects);
 });
 
 projectsRouter.get("/:id", async (req, res) => {
-  const project = await readOnly((db) => db.projects.find((p) => p.id === req.params.id));
+  const project = await readOnly(req.tenantId, (db) => db.projects.find((p) => p.id === req.params.id));
   if (!project) return res.status(404).json({ error: "Projeto não encontrado" });
   res.json(project);
 });
@@ -39,7 +39,7 @@ projectsRouter.post("/", async (req, res) => {
     return res.status(400).json({ error: "clientName é obrigatório" });
   }
 
-  const project = await withDb((db) => {
+  const project = await withDb(req.tenantId, (db) => {
     const built = buildProjectFromTemplate(
       { clientName, clientType, responsible, contactEmail, startDate },
       { nextId: (prefix) => nextId(db, prefix), todayISO }
@@ -56,7 +56,7 @@ projectsRouter.post("/", async (req, res) => {
 
   const projectInfo = { id: project.id, clientName: project.clientName, clientType: project.clientType };
   for (const task of project.tasks) {
-    emitEvent("task.created", {
+    emitEvent(req.tenantId, "task.created", {
       task: { ...task, projectId: project.id, projectName: project.clientName, projectStatus: project.status },
       project: projectInfo,
     }).catch(() => {});
@@ -65,7 +65,7 @@ projectsRouter.post("/", async (req, res) => {
 
 projectsRouter.patch("/:id", async (req, res) => {
   const allowed = ["clientName", "clientType", "responsible", "contactEmail", "status", "startDate", "deadline", "ownerResponsibleId", "notes", "meetingLink", "meetingSource"];
-  const updated = await withDb((db) => {
+  const updated = await withDb(req.tenantId, (db) => {
     const project = db.projects.find((p) => p.id === req.params.id);
     if (!project) return null;
     for (const key of allowed) {

@@ -1,10 +1,10 @@
 import { NavLink } from "react-router-dom";
-import { LayoutGrid, CalendarCheck, Users, Database } from "lucide-react";
+import { LayoutGrid, CalendarCheck, Users, Database, LogOut } from "lucide-react";
 
 const linkBase =
   "flex items-center justify-center w-11 h-11 rounded-xl transition-colors";
 
-export default function Sidebar({ open, onNavigate }) {
+export default function Sidebar({ open, onNavigate, onLogout }) {
   return (
     <>
       {open && (
@@ -57,9 +57,16 @@ export default function Sidebar({ open, onNavigate }) {
             <Users size={20} />
           </NavLink>
         </nav>
-        <div className="text-white/30 pb-1" title="Dados salvos num banco compartilhado">
+        <div className="text-white/30 mb-2" title="Dados salvos num banco compartilhado">
           <Database size={16} />
         </div>
+        <button
+          onClick={onLogout}
+          title="Sair"
+          className="w-9 h-9 flex items-center justify-center rounded-lg text-white/40 hover:bg-white/5 hover:text-white/80"
+        >
+          <LogOut size={16} />
+        </button>
       </aside>
     </>
   );

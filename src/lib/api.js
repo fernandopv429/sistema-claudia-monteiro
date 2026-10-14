@@ -1,10 +1,22 @@
+import { getTenantKey, clearTenantKey } from "./tenant";
+
 const BASE = "/api";
 
 async function request(path, options = {}) {
+  const tenantKey = getTenantKey();
   const res = await fetch(`${BASE}${path}`, {
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(tenantKey ? { "X-Tenant-Key": tenantKey } : {}),
+    },
     ...options,
   });
+  if (res.status === 401) {
+    // chave inválida/expirada: desloga e avisa o App pra mostrar a tela de
+    // login de novo, em vez de deixar a página inteira travada em erro.
+    clearTenantKey();
+    window.dispatchEvent(new Event("painel:unauthorized"));
+  }
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     throw new Error(body.error || `Erro ${res.status} em ${path}`);
