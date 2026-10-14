@@ -1,5 +1,5 @@
 import { NavLink } from "react-router-dom";
-import { LayoutGrid, CalendarCheck, Users, Building2, Database, LogOut } from "lucide-react";
+import { LayoutGrid, CalendarCheck, Users, Database, LogOut } from "lucide-react";
 
 const linkBase =
   "flex items-center justify-center w-11 h-11 rounded-xl transition-colors";
@@ -55,16 +55,6 @@ export default function Sidebar({ open, onNavigate, onLogout }) {
             }
           >
             <Users size={20} />
-          </NavLink>
-          <NavLink
-            to="/clientes"
-            title="Clientes"
-            onClick={onNavigate}
-            className={({ isActive }) =>
-              `${linkBase} ${isActive ? "bg-white/10 text-white" : "text-white/60 hover:bg-white/5 hover:text-white"}`
-            }
-          >
-            <Building2 size={20} />
           </NavLink>
         </nav>
         <div className="text-white/30 mb-2" title="Dados salvos num banco compartilhado">
