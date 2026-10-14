@@ -11,7 +11,9 @@ import Clients from "./pages/Clients";
 import { listProjects, getMe } from "./lib/api";
 import { getTenantKey, clearTenantKey } from "./lib/tenant";
 
-export default function App() {
+// Painel normal — dashboard, tarefas, projetos, responsáveis. Exige login
+// com a chave de um cliente (ou a chave pessoal de um responsável).
+function MainPanel() {
   const [loggedIn, setLoggedIn] = useState(() => Boolean(getTenantKey()));
   const [projects, setProjects] = useState([]);
   const [me, setMe] = useState(null);
@@ -53,41 +55,52 @@ export default function App() {
   }
 
   return (
-    <HashRouter>
-      <div className="flex min-h-screen">
-        <Sidebar open={menuOpen} onNavigate={() => setMenuOpen(false)} onLogout={handleLogout} />
-        <div className="flex-1 min-w-0 flex flex-col">
-          <div className="sm:hidden sticky top-0 z-30 flex items-center h-12 px-3 bg-white border-b border-slate-200">
-            <button
-              onClick={() => setMenuOpen((v) => !v)}
-              className="w-9 h-9 flex items-center justify-center rounded-lg text-ink-900 hover:bg-slate-100"
-              title={menuOpen ? "Fechar menu" : "Abrir menu"}
-            >
-              {menuOpen ? <X size={18} /> : <Menu size={18} />}
-            </button>
-          </div>
-          <main className="flex-1 min-w-0">
-            {error && (
-              <div className="m-6 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-sm px-4 py-3">
-                Não consegui falar com a API ({error}). Confira se o servidor está rodando em{" "}
-                <code>localhost:4000</code> (<code>cd server && npm run dev</code>).
-              </div>
-            )}
-            {!loading && !error && (
-              <Routes>
-                <Route path="/" element={<Dashboard projects={projects} refresh={refresh} me={me} />} />
-                <Route path="/hoje" element={<Today projects={projects} refresh={refresh} />} />
-                <Route
-                  path="/projeto/:id"
-                  element={<ProjectDetail projects={projects} refresh={refresh} me={me} />}
-                />
-                <Route path="/responsaveis" element={<Responsibles me={me} />} />
-                <Route path="/clientes" element={<Clients />} />
-              </Routes>
-            )}
-          </main>
+    <div className="flex min-h-screen">
+      <Sidebar open={menuOpen} onNavigate={() => setMenuOpen(false)} onLogout={handleLogout} />
+      <div className="flex-1 min-w-0 flex flex-col">
+        <div className="sm:hidden sticky top-0 z-30 flex items-center h-12 px-3 bg-white border-b border-slate-200">
+          <button
+            onClick={() => setMenuOpen((v) => !v)}
+            className="w-9 h-9 flex items-center justify-center rounded-lg text-ink-900 hover:bg-slate-100"
+            title={menuOpen ? "Fechar menu" : "Abrir menu"}
+          >
+            {menuOpen ? <X size={18} /> : <Menu size={18} />}
+          </button>
         </div>
+        <main className="flex-1 min-w-0">
+          {error && (
+            <div className="m-6 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-sm px-4 py-3">
+              Não consegui falar com a API ({error}). Confira se o servidor está rodando em{" "}
+              <code>localhost:4000</code> (<code>cd server && npm run dev</code>).
+            </div>
+          )}
+          {!loading && !error && (
+            <Routes>
+              <Route path="/" element={<Dashboard projects={projects} refresh={refresh} me={me} />} />
+              <Route path="/hoje" element={<Today projects={projects} refresh={refresh} />} />
+              <Route
+                path="/projeto/:id"
+                element={<ProjectDetail projects={projects} refresh={refresh} me={me} />}
+              />
+              <Route path="/responsaveis" element={<Responsibles me={me} />} />
+            </Routes>
+          )}
+        </main>
       </div>
+    </div>
+  );
+}
+
+// /admin tem autenticação própria (chave de super-admin, não a de cliente) e
+// por isso fica fora do gate de login do painel normal — precisa ser
+// alcançável mesmo sem estar logado em nenhum cliente.
+export default function App() {
+  return (
+    <HashRouter>
+      <Routes>
+        <Route path="/admin" element={<Clients />} />
+        <Route path="/*" element={<MainPanel />} />
+      </Routes>
     </HashRouter>
   );
 }
