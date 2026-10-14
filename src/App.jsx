@@ -7,6 +7,7 @@ import Dashboard from "./pages/Dashboard";
 import Today from "./pages/Today";
 import ProjectDetail from "./pages/ProjectDetail";
 import Responsibles from "./pages/Responsibles";
+import Clients from "./pages/Clients";
 import { listProjects } from "./lib/api";
 import { getTenantKey, clearTenantKey } from "./lib/tenant";
 
@@ -73,6 +74,7 @@ export default function App() {
                 <Route path="/hoje" element={<Today projects={projects} refresh={refresh} />} />
                 <Route path="/projeto/:id" element={<ProjectDetail projects={projects} refresh={refresh} />} />
                 <Route path="/responsaveis" element={<Responsibles />} />
+                <Route path="/clientes" element={<Clients />} />
               </Routes>
             )}
           </main>

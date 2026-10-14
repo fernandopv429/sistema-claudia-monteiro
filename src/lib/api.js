@@ -1,4 +1,4 @@
-import { getTenantKey, clearTenantKey } from "./tenant";
+import { getTenantKey, clearTenantKey, getSuperAdminKey } from "./tenant";
 
 const BASE = "/api";
 
@@ -97,4 +97,44 @@ export function listMeetingNotes(params = {}) {
 
 export function updateMeetingNote(id, patch) {
   return request(`/meeting-notes/${id}`, { method: "PATCH", body: JSON.stringify(patch) });
+}
+
+// Gerenciamento de clientes (tenants) usa uma chave separada da de login do
+// painel (x-super-admin-key, não X-Tenant-Key) — só quem cadastra clientes
+// novos tem essa chave.
+async function adminRequest(path, options = {}) {
+  const key = getSuperAdminKey();
+  const res = await fetch(`${BASE}${path}`, {
+    headers: {
+      "Content-Type": "application/json",
+      ...(key ? { "x-super-admin-key": key } : {}),
+    },
+    ...options,
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error || `Erro ${res.status} em ${path}`);
+  }
+  if (res.status === 204) return null;
+  return res.json();
+}
+
+export function listTenants() {
+  return adminRequest("/tenants");
+}
+
+export function createTenant(data) {
+  return adminRequest("/tenants", { method: "POST", body: JSON.stringify(data) });
+}
+
+export function deleteTenant(id) {
+  return adminRequest(`/tenants/${id}`, { method: "DELETE" });
+}
+
+export function getTenantQrCode(id) {
+  return adminRequest(`/tenants/${id}/qrcode`);
+}
+
+export function getTenantStatus(id) {
+  return adminRequest(`/tenants/${id}/status`);
 }
