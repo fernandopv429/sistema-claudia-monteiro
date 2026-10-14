@@ -4,31 +4,19 @@ import { buildProjectFromTemplate } from "../template.js";
 import { todayISO } from "../dates.js";
 import { emitEvent } from "../events.js";
 import { PROJECT_STATUSES, normalizeStatus } from "../status.js";
-import { onlyDigits } from "../phone.js";
+import { projectsVisibleToPhone } from "../phone.js";
 
 export const projectsRouter = Router();
 
-// Acha o id do responsável cadastrado dono desse telefone, ou null.
-function ownerIdForPhone(db, phone) {
-  const digits = onlyDigits(phone);
-  if (!digits) return null;
-  const match = db.responsibles.find((r) => onlyDigits(r.phone) === digits);
-  return match ? match.id : null;
-}
-
 // GET /api/projects?phone=5511999999999
 // Sem "phone" (uso normal do painel web), devolve tudo. Com "phone" (usado
-// pelo agente do WhatsApp via listar_projetos), devolve só os projetos cujo
-// ownerResponsibleId bate com o responsável dono desse telefone — assim cada
-// pessoa só vê/mexe nos projetos que são dela. Telefone não cadastrado ou sem
-// projeto nenhum vinculado = lista vazia, nunca a lista inteira.
+// pelo agente do WhatsApp via listar_projetos), devolve só os projetos que
+// esse telefone pode ver: tudo se for um responsável "master", só os
+// próprios se for um responsável comum, nada se o telefone não bater com
+// ninguém cadastrado.
 projectsRouter.get("/", async (req, res) => {
   const db = await readOnly((db) => db);
-  let projects = db.projects;
-  if (req.query.phone) {
-    const ownerId = ownerIdForPhone(db, req.query.phone);
-    projects = ownerId ? projects.filter((p) => p.ownerResponsibleId === ownerId) : [];
-  }
+  const projects = req.query.phone ? projectsVisibleToPhone(db, req.query.phone) : db.projects;
   res.json(projects);
 });
 

@@ -4,14 +4,7 @@ import { todayISO } from "../dates.js";
 import { emitEvent } from "../events.js";
 import { TASK_STATUSES, normalizeStatus } from "../status.js";
 import { buildTask, flattenTask, clampFutureDeadline } from "../taskHelpers.js";
-import { onlyDigits } from "../phone.js";
-
-function ownerIdForPhone(db, phone) {
-  const digits = onlyDigits(phone);
-  if (!digits) return null;
-  const match = db.responsibles.find((r) => onlyDigits(r.phone) === digits);
-  return match ? match.id : null;
-}
+import { projectsVisibleToPhone } from "../phone.js";
 
 export const tasksRouter = Router();
 
@@ -28,11 +21,7 @@ tasksRouter.get("/", async (req, res) => {
   const today = todayISO();
 
   const db = await readOnly((db) => db);
-  let projects = db.projects;
-  if (phone) {
-    const ownerId = ownerIdForPhone(db, phone);
-    projects = ownerId ? projects.filter((p) => p.ownerResponsibleId === ownerId) : [];
-  }
+  const projects = phone ? projectsVisibleToPhone(db, phone) : db.projects;
   let tasks = projects.flatMap((p) => p.tasks.map((t) => flattenTask(p, t, db.responsibles)));
 
   if (projectId) tasks = tasks.filter((t) => t.projectId === projectId);

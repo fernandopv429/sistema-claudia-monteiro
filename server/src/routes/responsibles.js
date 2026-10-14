@@ -21,16 +21,18 @@ responsiblesRouter.get("/check", async (req, res) => {
   res.json({ registered: !!match, responsible: match || null });
 });
 
-// POST /api/responsibles { name, phone }
+// POST /api/responsibles { name, phone, isMaster? }
 // phone é o número usado pelo WhatsApp (Evolution API) pra notificar essa
 // pessoa quando uma tarefa dela estiver perto do prazo, atrasada, etc.
+// isMaster: true ignora o filtro por dono de projeto — essa pessoa vê e
+// mexe em todos os projetos pelo WhatsApp, não só nos que são dela.
 responsiblesRouter.post("/", async (req, res) => {
-  const { name, phone } = req.body || {};
+  const { name, phone, isMaster } = req.body || {};
   if (!name || !name.trim()) return res.status(400).json({ error: "name é obrigatório" });
   if (!phone || !phone.trim()) return res.status(400).json({ error: "phone é obrigatório" });
 
   const responsible = await withDb((db) => {
-    const r = { id: nextId(db, "resp"), name: name.trim(), phone: phone.trim() };
+    const r = { id: nextId(db, "resp"), name: name.trim(), phone: phone.trim(), isMaster: Boolean(isMaster) };
     db.responsibles.push(r);
     return r;
   });
@@ -38,7 +40,7 @@ responsiblesRouter.post("/", async (req, res) => {
 });
 
 responsiblesRouter.patch("/:id", async (req, res) => {
-  const allowed = ["name", "phone"];
+  const allowed = ["name", "phone", "isMaster"];
   const updated = await withDb((db) => {
     const r = db.responsibles.find((r) => r.id === req.params.id);
     if (!r) return null;
