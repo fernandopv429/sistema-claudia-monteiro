@@ -3,6 +3,7 @@ import { withDb, readOnly, nextId } from "../db.js";
 import { buildTask, flattenTask } from "../taskHelpers.js";
 import { todayISO, addDays } from "../dates.js";
 import { emitEvent } from "../events.js";
+import { requireAdmin } from "../access.js";
 
 export const meetingNotesRouter = Router();
 
@@ -113,7 +114,7 @@ meetingNotesRouter.get("/:id", async (req, res) => {
 // cria elas no projeto agora — mesma regra do match automático (sem
 // responsável, tag source:"meet"). tasksCreated evita duplicar se a nota for
 // vinculada de novo depois.
-meetingNotesRouter.patch("/:id", async (req, res) => {
+meetingNotesRouter.patch("/:id", requireAdmin, async (req, res) => {
   const allowed = ["status", "projectId"];
   const result = await withDb(req.tenantId, (db) => {
     const note = db.meetingNotes.find((n) => n.id === req.params.id);

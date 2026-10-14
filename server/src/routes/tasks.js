@@ -4,7 +4,7 @@ import { todayISO } from "../dates.js";
 import { emitEvent } from "../events.js";
 import { TASK_STATUSES, normalizeStatus } from "../status.js";
 import { buildTask, flattenTask, clampFutureDeadline } from "../taskHelpers.js";
-import { projectsVisibleToPhone } from "../phone.js";
+import { canAccessProject, visibleProjects } from "../access.js";
 
 export const tasksRouter = Router();
 
@@ -12,16 +12,16 @@ function projectSummary(project) {
   return { id: project.id, clientName: project.clientName, clientType: project.clientType };
 }
 
-// GET /api/tasks?projectId=&status=&overdue=true&dueOn=YYYY-MM-DD&dueBefore=&dueAfter=&phone=
-// "phone" (usado pelo agente do WhatsApp) restringe o resultado às tarefas de
-// projetos cujo dono é o responsável cadastrado nesse telefone — mesma regra
-// de GET /api/projects.
+// GET /api/tasks?projectId=&status=&overdue=true&dueOn=YYYY-MM-DD&dueBefore=&dueAfter=
+// Só traz tarefas de projetos que quem está logado pode ver (mesma regra de
+// GET /api/projects — tudo pra admin/master, só os próprios pra um
+// responsável comum).
 tasksRouter.get("/", async (req, res) => {
-  const { projectId, status, overdue, dueOn, dueBefore, dueAfter, phone } = req.query;
+  const { projectId, status, overdue, dueOn, dueBefore, dueAfter } = req.query;
   const today = todayISO();
 
   const db = await readOnly(req.tenantId, (db) => db);
-  const projects = phone ? projectsVisibleToPhone(db, phone) : db.projects;
+  const projects = visibleProjects(db, req.responsible);
   let tasks = projects.flatMap((p) => p.tasks.map((t) => flattenTask(p, t, db.responsibles)));
 
   if (projectId) tasks = tasks.filter((t) => t.projectId === projectId);
@@ -39,7 +39,10 @@ tasksRouter.get("/:id", async (req, res) => {
   const db = await readOnly(req.tenantId, (db) => db);
   for (const project of db.projects) {
     const task = project.tasks.find((t) => t.id === req.params.id);
-    if (task) return res.json(flattenTask(project, task, db.responsibles));
+    if (task) {
+      if (!canAccessProject(req, project)) return res.status(403).json({ error: "Essa tarefa não é sua" });
+      return res.json(flattenTask(project, task, db.responsibles));
+    }
   }
   res.status(404).json({ error: "Tarefa não encontrada" });
 });
@@ -58,6 +61,7 @@ tasksRouter.post("/", async (req, res) => {
   const result = await withDb(req.tenantId, (db) => {
     const project = db.projects.find((p) => p.id === projectId);
     if (!project) return { error: "Projeto não encontrado", code: 404 };
+    if (!canAccessProject(req, project)) return { error: "Esse projeto não é seu", code: 403 };
 
     const task = buildTask(db, project, { title, deadline, responsible, responsibleId, status, phaseId, phaseName });
     if (!task) return { error: "Projeto não tem fases", code: 400 };
@@ -78,6 +82,7 @@ tasksRouter.patch("/:id", async (req, res) => {
     for (const project of db.projects) {
       const task = project.tasks.find((t) => t.id === req.params.id);
       if (!task) continue;
+      if (!canAccessProject(req, project)) return { error: "Essa tarefa não é sua", code: 403 };
       const wasCompleted = task.status === "Concluído";
       for (const key of allowed) {
         if (req.body && key in req.body) {
@@ -97,9 +102,9 @@ tasksRouter.patch("/:id", async (req, res) => {
       const justCompleted = !wasCompleted && task.status === "Concluído";
       return { task: flattenTask(project, task, db.responsibles), project, justCompleted };
     }
-    return null;
+    return { error: "Tarefa não encontrada", code: 404 };
   });
-  if (!result) return res.status(404).json({ error: "Tarefa não encontrada" });
+  if (result.error) return res.status(result.code).json({ error: result.error });
   res.json(result.task);
 
   if (result.justCompleted) {

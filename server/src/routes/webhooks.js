@@ -1,8 +1,13 @@
 import { Router } from "express";
 import { withDb, readOnly, nextId } from "../db.js";
 import { checkDueSoonAndNotify, sendWebhook } from "../scheduler.js";
+import { requireAdmin } from "../access.js";
 
 export const webhooksRouter = Router();
+
+// Webhooks são configuração de infraestrutura da conta (ex: integração com
+// n8n) — só quem tem acesso total mexe nisso, não é algo de um projeto só.
+webhooksRouter.use(requireAdmin);
 
 webhooksRouter.get("/", async (req, res) => {
   res.json(await readOnly(req.tenantId, (db) => db.webhooks));

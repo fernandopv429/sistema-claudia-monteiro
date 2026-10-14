@@ -41,6 +41,14 @@ export function updateProject(id, patch) {
   return request(`/projects/${id}`, { method: "PATCH", body: JSON.stringify(patch) });
 }
 
+export function deleteProject(id) {
+  return request(`/projects/${id}`, { method: "DELETE" });
+}
+
+export function getMe() {
+  return request("/me");
+}
+
 export function createTask(data) {
   return request("/tasks", { method: "POST", body: JSON.stringify(data) });
 }
@@ -88,6 +96,10 @@ export function updateResponsible(id, patch) {
 
 export function deleteResponsible(id) {
   return request(`/responsibles/${id}`, { method: "DELETE" });
+}
+
+export function issueResponsibleKey(id) {
+  return request(`/responsibles/${id}/key`, { method: "POST" });
 }
 
 export function listMeetingNotes(params = {}) {

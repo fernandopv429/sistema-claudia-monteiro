@@ -1,13 +1,19 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, CheckCircle2, Circle, Plus, Check } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Circle, Plus, Check, Trash2 } from "lucide-react";
 import ProgressBar from "../components/ProgressBar";
 import { StatusPill, MeetTag, MeetingSourceTag } from "../components/Badges";
 import { computeProgress, currentPhase } from "../lib/store";
-import { updateTask, createTask, updateProject as apiUpdateProject, listResponsibles } from "../lib/api";
+import {
+  updateTask,
+  createTask,
+  updateProject as apiUpdateProject,
+  deleteProject as apiDeleteProject,
+  listResponsibles,
+} from "../lib/api";
 import { formatDatePT, isOverdue, todayISO } from "../lib/dates";
 
-export default function ProjectDetail({ projects, refresh }) {
+export default function ProjectDetail({ projects, refresh, me }) {
   const { id } = useParams();
   const navigate = useNavigate();
   const project = projects.find((p) => p.id === id);
@@ -71,6 +77,13 @@ export default function ProjectDetail({ projects, refresh }) {
     await refresh();
   }
 
+  async function handleDeleteProject() {
+    if (!confirm(`Apagar o projeto "${project.clientName}"? Isso remove ele e todas as tarefas, sem volta.`)) return;
+    await apiDeleteProject(project.id);
+    await refresh();
+    navigate("/");
+  }
+
   async function setTaskDeadline(taskId, deadline) {
     await updateTask(taskId, { deadline });
     await refresh();
@@ -113,6 +126,15 @@ export default function ProjectDetail({ projects, refresh }) {
             <option>Pausado</option>
             <option>Concluído</option>
           </select>
+          {me?.isAdmin && (
+            <button
+              onClick={handleDeleteProject}
+              title="Apagar projeto"
+              className="w-9 h-9 flex items-center justify-center rounded-lg text-slate-300 hover:text-rose-500 hover:bg-rose-50"
+            >
+              <Trash2 size={16} />
+            </button>
+          )}
         </div>
       </div>
 

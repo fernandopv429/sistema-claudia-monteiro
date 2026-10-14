@@ -9,6 +9,7 @@ import { webhooksRouter } from "./routes/webhooks.js";
 import { meetingNotesRouter } from "./routes/meetingNotes.js";
 import { responsiblesRouter, checkRegisteredPhone } from "./routes/responsibles.js";
 import { tenantsRouter } from "./routes/tenants.js";
+import { meRouter } from "./routes/me.js";
 import { resolveTenant } from "./tenantAuth.js";
 import { startScheduler } from "./scheduler.js";
 import { readTenants } from "./db.js";
@@ -39,6 +40,7 @@ app.get("/api/responsibles/check", checkRegisteredPhone);
 // cliente pra achar de quem é esse número.
 app.use("/api", resolveTenant);
 
+app.use("/api/me", meRouter);
 app.use("/api/projects", projectsRouter);
 app.use("/api/tasks", tasksRouter);
 app.use("/api/webhooks", webhooksRouter);

@@ -9,7 +9,7 @@ import { computeProgress, currentPhase, overdueCount } from "../lib/store";
 import { createProject } from "../lib/api";
 import { formatDatePT } from "../lib/dates";
 
-export default function Dashboard({ projects, refresh }) {
+export default function Dashboard({ projects, refresh, me }) {
   const [searchParams] = useSearchParams();
   const [showModal, setShowModal] = useState(() => searchParams.get("novo") === "1");
   const [saving, setSaving] = useState(false);
@@ -46,13 +46,15 @@ export default function Dashboard({ projects, refresh }) {
             )}
           </p>
         </div>
-        <button
-          onClick={() => setShowModal(true)}
-          className="flex items-center gap-2 bg-brand-500 hover:bg-brand-600 text-white text-sm font-medium px-4 py-2.5 rounded-lg shadow-sm"
-        >
-          <Plus size={18} />
-          Novo projeto
-        </button>
+        {me?.isAdmin && (
+          <button
+            onClick={() => setShowModal(true)}
+            className="flex items-center gap-2 bg-brand-500 hover:bg-brand-600 text-white text-sm font-medium px-4 py-2.5 rounded-lg shadow-sm"
+          >
+            <Plus size={18} />
+            Novo projeto
+          </button>
+        )}
       </div>
 
       <MeetingNotesInbox projects={projects} onLinked={refresh} />

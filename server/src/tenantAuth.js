@@ -1,31 +1,57 @@
 import { readTenants, readAllTenantData } from "./db.js";
 import { onlyDigits } from "./phone.js";
 
-// Resolve o tenant da requisição de duas formas possíveis:
-// 1. Painel web: header "X-Tenant-Key" com a chave de acesso daquele cliente.
-// 2. Agente do WhatsApp: query/body "phone" — acha, entre TODOS os tenants,
-//    qual tem um responsável cadastrado com esse telefone. Isso evita ter
-//    que ensinar o n8n a mandar qual tenant é; o telefone já basta.
+// Resolve o tenant (e, quando aplicável, QUEM especificamente está pedindo —
+// req.responsible, usado por access.js pra decidir o que essa pessoa pode
+// ver/mexer) de três formas possíveis, nessa ordem:
+//
+// 1. Painel web, chave da conta inteira: header "X-Tenant-Key" batendo com
+//    tenant.apiKey — acesso total (req.responsible = null).
+// 2. Painel web, login individual: o mesmo header "X-Tenant-Key", mas
+//    batendo com a chave pessoal de um responsável (responsible.accessKey)
+//    — escopo conforme accessKey (master ou só os projetos próprios).
+// 3. Agente do WhatsApp: query/body "phone" — acha, entre TODOS os tenants,
+//    o responsável cadastrado com esse telefone (e o tenant dele junto).
 export async function resolveTenant(req, res, next) {
   try {
     const keyHeader = req.headers["x-tenant-key"];
     if (keyHeader) {
       const tenants = await readTenants();
       const tenant = tenants.find((t) => t.apiKey === keyHeader);
-      if (!tenant) return res.status(401).json({ error: "Chave de acesso inválida" });
-      req.tenantId = tenant.id;
-      req.tenant = tenant;
-      return next();
+      if (tenant) {
+        req.tenantId = tenant.id;
+        req.tenant = tenant;
+        req.responsible = null;
+        return next();
+      }
+
+      const all = await readAllTenantData();
+      for (const { tenantId, db } of all) {
+        const resp = db.responsibles.find((r) => r.accessKey === keyHeader);
+        if (resp) {
+          req.tenantId = tenantId;
+          req.tenant = tenants.find((t) => t.id === tenantId) || null;
+          req.responsible = resp;
+          return next();
+        }
+      }
+      return res.status(401).json({ error: "Chave de acesso inválida" });
     }
 
     const phone = req.query.phone || req.body?.phone;
     if (phone) {
       const digits = onlyDigits(phone);
-      const all = await readAllTenantData();
-      const match = all.find(({ db }) => db.responsibles.some((r) => onlyDigits(r.phone) === digits));
-      if (!match) return res.status(403).json({ error: "Telefone não cadastrado em nenhum cliente" });
-      req.tenantId = match.tenantId;
-      return next();
+      const [tenants, all] = await Promise.all([readTenants(), readAllTenantData()]);
+      for (const { tenantId, db } of all) {
+        const resp = db.responsibles.find((r) => onlyDigits(r.phone) === digits);
+        if (resp) {
+          req.tenantId = tenantId;
+          req.tenant = tenants.find((t) => t.id === tenantId) || null;
+          req.responsible = resp;
+          return next();
+        }
+      }
+      return res.status(403).json({ error: "Telefone não cadastrado em nenhum cliente" });
     }
 
     return res.status(401).json({ error: "Informe X-Tenant-Key (painel) ou phone (agente)" });

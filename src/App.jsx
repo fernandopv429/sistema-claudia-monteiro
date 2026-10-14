@@ -8,12 +8,13 @@ import Today from "./pages/Today";
 import ProjectDetail from "./pages/ProjectDetail";
 import Responsibles from "./pages/Responsibles";
 import Clients from "./pages/Clients";
-import { listProjects } from "./lib/api";
+import { listProjects, getMe } from "./lib/api";
 import { getTenantKey, clearTenantKey } from "./lib/tenant";
 
 export default function App() {
   const [loggedIn, setLoggedIn] = useState(() => Boolean(getTenantKey()));
   const [projects, setProjects] = useState([]);
+  const [me, setMe] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -29,11 +30,14 @@ export default function App() {
 
   useEffect(() => {
     if (!loggedIn) return;
-    refresh().finally(() => setLoading(false));
+    Promise.all([refresh(), getMe().then(setMe).catch(() => {})]).finally(() => setLoading(false));
   }, [loggedIn, refresh]);
 
   useEffect(() => {
-    const onUnauthorized = () => setLoggedIn(false);
+    const onUnauthorized = () => {
+      setLoggedIn(false);
+      setMe(null);
+    };
     window.addEventListener("painel:unauthorized", onUnauthorized);
     return () => window.removeEventListener("painel:unauthorized", onUnauthorized);
   }, []);
@@ -41,6 +45,7 @@ export default function App() {
   function handleLogout() {
     clearTenantKey();
     setLoggedIn(false);
+    setMe(null);
   }
 
   if (!loggedIn) {
@@ -70,10 +75,13 @@ export default function App() {
             )}
             {!loading && !error && (
               <Routes>
-                <Route path="/" element={<Dashboard projects={projects} refresh={refresh} />} />
+                <Route path="/" element={<Dashboard projects={projects} refresh={refresh} me={me} />} />
                 <Route path="/hoje" element={<Today projects={projects} refresh={refresh} />} />
-                <Route path="/projeto/:id" element={<ProjectDetail projects={projects} refresh={refresh} />} />
-                <Route path="/responsaveis" element={<Responsibles />} />
+                <Route
+                  path="/projeto/:id"
+                  element={<ProjectDetail projects={projects} refresh={refresh} me={me} />}
+                />
+                <Route path="/responsaveis" element={<Responsibles me={me} />} />
                 <Route path="/clientes" element={<Clients />} />
               </Routes>
             )}
