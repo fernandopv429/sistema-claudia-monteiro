@@ -63,18 +63,42 @@ export async function deleteInstance(instanceName) {
   try {
     await evoFetch(`/instance/delete/${instanceName}`, { method: "DELETE" });
   } catch (err) {
-    if (!/\b404\b/.test(err.message)) throw err;
+    if (!isInstanceNotFound(err)) throw err;
   }
 }
 
-// QR code de pareamento, pra mostrar pro cliente escanear no celular dele.
-// Expira depois de um tempo — buscar de novo se o cliente demorar.
-export async function fetchQrCode(instanceName) {
-  const data = await evoFetch(`/instance/connect/${instanceName}`, { method: "GET" });
-  return { base64: data?.base64 || null, pairingCode: data?.pairingCode || null };
+// A instância pode sumir da Evolution sem o nosso banco saber (apagada
+// manualmente no manager, reset do servidor, etc.) — detecta esse erro
+// específico pra poder recriar em vez de deixar o cliente travado sem
+// nenhum jeito de reconectar pelo próprio painel.
+function isInstanceNotFound(err) {
+  return /\b404\b/.test(err.message) && /does not exist/i.test(err.message);
 }
 
+// QR code de pareamento, pra mostrar pro cliente escanear no celular dele.
+// Expira depois de um tempo — buscar de novo se o cliente demorar. Se a
+// instância não existir mais na Evolution, recria ela na hora.
+export async function fetchQrCode(instanceName) {
+  try {
+    const data = await evoFetch(`/instance/connect/${instanceName}`, { method: "GET" });
+    return { base64: data?.base64 || null, pairingCode: data?.pairingCode || null };
+  } catch (err) {
+    if (!isInstanceNotFound(err)) throw err;
+    await provisionInstance(instanceName);
+    const data = await evoFetch(`/instance/connect/${instanceName}`, { method: "GET" });
+    return { base64: data?.base64 || null, pairingCode: data?.pairingCode || null };
+  }
+}
+
+// Se a instância não existe mais, não é erro pra quem só quer ver o status —
+// devolve "not_provisioned" pra UI mostrar "não conectado" e deixar quem
+// pediu o QR code (fetchQrCode) cuidar de recriar.
 export async function fetchConnectionState(instanceName) {
-  const data = await evoFetch(`/instance/connectionState/${instanceName}`, { method: "GET" });
-  return data?.instance?.state || "unknown";
+  try {
+    const data = await evoFetch(`/instance/connectionState/${instanceName}`, { method: "GET" });
+    return data?.instance?.state || "unknown";
+  } catch (err) {
+    if (isInstanceNotFound(err)) return "not_provisioned";
+    throw err;
+  }
 }

@@ -35,6 +35,11 @@ export default function WhatsApp() {
   }, []);
 
   const connected = status === "open";
+  const statusLabel = connected
+    ? "conectado"
+    : status === "not_provisioned"
+      ? "desconectado — clique em \"Gerar QR novo\""
+      : status || "aguardando pareamento";
 
   return (
     <div className="p-4 sm:p-8 max-w-md mx-auto">
@@ -54,7 +59,7 @@ export default function WhatsApp() {
         <div className="flex items-center justify-center gap-2 text-sm text-slate-500 mb-4">
           Status:{" "}
           <span className={`font-medium ${connected ? "text-emerald-600" : "text-slate-500"}`}>
-            {connected ? "conectado" : status || "aguardando pareamento"}
+            {statusLabel}
           </span>
           <button onClick={checkStatus} className="text-slate-400 hover:text-ink-900" title="Verificar de novo">
             <RefreshCw size={14} />

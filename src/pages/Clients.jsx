@@ -124,7 +124,11 @@ function QrModal({ tenant, onClose }) {
           <span
             className={`font-medium ${status === "open" ? "text-emerald-600" : "text-slate-500"}`}
           >
-            {status === "open" ? "conectado" : status || "aguardando"}
+            {status === "open"
+              ? "conectado"
+              : status === "not_provisioned"
+                ? 'desconectado — clique em "Gerar QR novo"'
+                : status || "aguardando"}
           </span>
           <button onClick={checkStatus} className="text-slate-400 hover:text-ink-900" title="Verificar de novo">
             <RefreshCw size={13} />
