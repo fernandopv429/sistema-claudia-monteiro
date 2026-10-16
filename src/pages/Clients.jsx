@@ -4,6 +4,7 @@ import {
   listTenants,
   createTenant,
   deleteTenant,
+  regenerateTenantKey,
   getTenantQrCode,
   getTenantStatus,
 } from "../lib/api";
@@ -66,18 +67,11 @@ function AdminLogin({ onSuccess }) {
   );
 }
 
-function QrModal({ tenant, freshApiKey, onClose }) {
+function QrModal({ tenant, onClose }) {
   const [qr, setQr] = useState(null);
   const [status, setStatus] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [copied, setCopied] = useState(false);
-
-  function copyKey() {
-    navigator.clipboard?.writeText(freshApiKey);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
-  }
 
   async function loadQr() {
     setLoading(true);
@@ -115,23 +109,9 @@ function QrModal({ tenant, freshApiKey, onClose }) {
       >
         <h2 className="text-base font-semibold text-ink-900 mb-1">WhatsApp de {tenant.name}</h2>
         <p className="text-xs text-slate-500 mb-4">
-          Peça pro cliente escanear esse QR code no WhatsApp dele (Aparelhos conectados → Conectar um aparelho).
+          Normalmente o próprio cliente pareia isso no painel dele (ícone de WhatsApp no menu). Use isso aqui só se
+          precisar checar o status ou ajudar ele a reconectar.
         </p>
-
-        {freshApiKey && (
-          <div className="text-left bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5 mb-4">
-            <div className="text-xs font-medium text-amber-800 mb-1">
-              Chave de acesso ao painel desse cliente — copie agora, não aparece de novo:
-            </div>
-            <button
-              onClick={copyKey}
-              className="w-full flex items-center justify-between gap-2 text-xs font-mono text-amber-900 bg-white border border-amber-200 rounded px-2 py-1.5 hover:bg-amber-50"
-            >
-              <span className="truncate">{freshApiKey}</span>
-              {copied ? <Check size={13} /> : <Copy size={13} />}
-            </button>
-          </div>
-        )}
 
         {loading && <div className="text-sm text-slate-400 py-10">Gerando QR code...</div>}
         {error && <div className="text-xs text-rose-600 mb-3">{error}</div>}
@@ -178,7 +158,14 @@ export default function Clients() {
   const [name, setName] = useState("");
   const [creating, setCreating] = useState(false);
   const [qrTenant, setQrTenant] = useState(null);
-  const [freshApiKey, setFreshApiKey] = useState(null);
+  const [freshTenant, setFreshTenant] = useState(null);
+  const [copied, setCopied] = useState(false);
+
+  function copyKey() {
+    navigator.clipboard?.writeText(freshTenant.apiKey);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  }
 
   function refresh() {
     return listTenants()
@@ -211,8 +198,7 @@ export default function Clients() {
       const tenant = await createTenant({ name: name.trim() });
       setName("");
       await refresh();
-      setFreshApiKey(tenant.apiKey);
-      setQrTenant(tenant);
+      setFreshTenant(tenant);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -227,6 +213,22 @@ export default function Clients() {
     try {
       await deleteTenant(tenant.id);
       await refresh();
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  async function handleRegenerateKey(tenant) {
+    if (
+      !confirm(
+        `Gerar uma chave nova pra "${tenant.name}"? A chave antiga para de funcionar na hora — use só se o cliente perdeu a dele.`
+      )
+    ) {
+      return;
+    }
+    try {
+      const { apiKey } = await regenerateTenantKey(tenant.id);
+      setFreshTenant({ ...tenant, apiKey, regenerated: true });
     } catch (err) {
       setError(err.message);
     }
@@ -262,6 +264,30 @@ export default function Clients() {
         <div className="mb-4 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-sm px-4 py-3">{error}</div>
       )}
 
+      {freshTenant && (
+        <div className="mb-4 rounded-lg bg-amber-50 border border-amber-200 px-4 py-3">
+          <div className="text-sm font-medium text-amber-900 mb-1">
+            {freshTenant.regenerated
+              ? `Chave nova gerada pra "${freshTenant.name}" — copie agora, ela não aparece de novo:`
+              : `"${freshTenant.name}" cadastrado — copie a chave de acesso agora, ela não aparece de novo:`}
+          </div>
+          <button
+            onClick={copyKey}
+            className="w-full flex items-center justify-between gap-2 text-xs font-mono text-amber-900 bg-white border border-amber-200 rounded px-2 py-1.5 hover:bg-amber-100 mb-2"
+          >
+            <span className="truncate">{freshTenant.apiKey}</span>
+            {copied ? <Check size={13} /> : <Copy size={13} />}
+          </button>
+          <p className="text-xs text-amber-700">
+            Passe essa chave pro cliente. Ele entra no painel com ela e pareia o próprio WhatsApp sozinho, no ícone de
+            WhatsApp do menu — não precisa fazer isso por ele aqui.
+          </p>
+          <button onClick={() => setFreshTenant(null)} className="text-xs text-amber-700 underline mt-2">
+            Fechar
+          </button>
+        </div>
+      )}
+
       <div className="bg-white rounded-2xl border border-slate-200 divide-y divide-slate-100">
         {!loading && tenants.length === 0 && (
           <div className="text-center py-12 text-slate-400 text-sm">Nenhum cliente cadastrado ainda.</div>
@@ -276,11 +302,15 @@ export default function Clients() {
               <div className="text-xs text-slate-400">instância: {t.evolutionInstance || "—"}</div>
             </div>
             <button
-              onClick={() => {
-                setFreshApiKey(null);
-                setQrTenant(t);
-              }}
-              title="Ver QR code do WhatsApp"
+              onClick={() => handleRegenerateKey(t)}
+              title="Gerar chave de acesso nova (se o cliente perdeu a dele)"
+              className="text-xs font-medium px-2.5 py-1.5 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 flex items-center gap-1"
+            >
+              <KeyRound size={13} /> Chave
+            </button>
+            <button
+              onClick={() => setQrTenant(t)}
+              title="Ver status/QR do WhatsApp (suporte)"
               className="text-xs font-medium px-2.5 py-1.5 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 flex items-center gap-1"
             >
               <QrCode size={13} /> QR
@@ -292,16 +322,7 @@ export default function Clients() {
         ))}
       </div>
 
-      {qrTenant && (
-        <QrModal
-          tenant={qrTenant}
-          freshApiKey={freshApiKey}
-          onClose={() => {
-            setQrTenant(null);
-            setFreshApiKey(null);
-          }}
-        />
-      )}
+      {qrTenant && <QrModal tenant={qrTenant} onClose={() => setQrTenant(null)} />}
     </div>
   );
 }

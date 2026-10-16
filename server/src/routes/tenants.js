@@ -1,6 +1,6 @@
 import { Router } from "express";
 import crypto from "node:crypto";
-import { withTenants, withDb, readTenants } from "../db.js";
+import { withTenants, withDb, readTenants, deleteTenantData } from "../db.js";
 import { requireSuperAdmin } from "../tenantAuth.js";
 import { provisionInstance, deleteInstance, fetchQrCode, fetchConnectionState } from "../evolution.js";
 
@@ -52,6 +52,22 @@ tenantsRouter.post("/", async (req, res) => {
   res.status(201).json(tenant);
 });
 
+// POST /api/tenants/:id/regenerate-key — se o cliente perder a chave de
+// acesso da conta inteira, não tem como recuperar a antiga (ela não fica
+// guardada em lugar nenhum visível) — só dá pra gerar uma nova, que invalida
+// a anterior. Só aparece nessa resposta.
+tenantsRouter.post("/:id/regenerate-key", async (req, res) => {
+  const newKey = "tn_" + crypto.randomBytes(24).toString("hex");
+  const updated = await withTenants((registry) => {
+    const tenant = registry.tenants.find((t) => t.id === req.params.id);
+    if (!tenant) return null;
+    tenant.apiKey = newKey;
+    return tenant;
+  });
+  if (!updated) return res.status(404).json({ error: "Tenant não encontrado" });
+  res.json({ apiKey: updated.apiKey });
+});
+
 // GET /api/tenants/:id/qrcode — QR code pra parear o WhatsApp desse cliente.
 // Chamar de novo se o cliente demorar e o QR expirar.
 tenantsRouter.get("/:id/qrcode", async (req, res) => {
@@ -86,6 +102,7 @@ tenantsRouter.delete("/:id", async (req, res) => {
   await withTenants((registry) => {
     registry.tenants = registry.tenants.filter((t) => t.id !== req.params.id);
   });
+  await deleteTenantData(tenant.id);
 
   if (tenant.evolutionInstance) {
     await deleteInstance(tenant.evolutionInstance).catch((err) =>

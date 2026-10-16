@@ -49,6 +49,14 @@ export function getMe() {
   return request("/me");
 }
 
+export function getWhatsappStatus() {
+  return request("/whatsapp/status");
+}
+
+export function getWhatsappQrCode() {
+  return request("/whatsapp/qrcode");
+}
+
 export function createTask(data) {
   return request("/tasks", { method: "POST", body: JSON.stringify(data) });
 }
@@ -141,6 +149,10 @@ export function createTenant(data) {
 
 export function deleteTenant(id) {
   return adminRequest(`/tenants/${id}`, { method: "DELETE" });
+}
+
+export function regenerateTenantKey(id) {
+  return adminRequest(`/tenants/${id}/regenerate-key`, { method: "POST" });
 }
 
 export function getTenantQrCode(id) {

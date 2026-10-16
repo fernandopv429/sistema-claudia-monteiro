@@ -7,6 +7,7 @@ import Dashboard from "./pages/Dashboard";
 import Today from "./pages/Today";
 import ProjectDetail from "./pages/ProjectDetail";
 import Responsibles from "./pages/Responsibles";
+import WhatsAppPage from "./pages/WhatsApp";
 import Clients from "./pages/Clients";
 import { listProjects, getMe } from "./lib/api";
 import { getTenantKey, clearTenantKey } from "./lib/tenant";
@@ -56,7 +57,7 @@ function MainPanel() {
 
   return (
     <div className="flex min-h-screen">
-      <Sidebar open={menuOpen} onNavigate={() => setMenuOpen(false)} onLogout={handleLogout} />
+      <Sidebar open={menuOpen} onNavigate={() => setMenuOpen(false)} onLogout={handleLogout} me={me} />
       <div className="flex-1 min-w-0 flex flex-col">
         <div className="sm:hidden sticky top-0 z-30 flex items-center h-12 px-3 bg-white border-b border-slate-200">
           <button
@@ -83,6 +84,7 @@ function MainPanel() {
                 element={<ProjectDetail projects={projects} refresh={refresh} me={me} />}
               />
               <Route path="/responsaveis" element={<Responsibles me={me} />} />
+              <Route path="/whatsapp" element={<WhatsAppPage />} />
             </Routes>
           )}
         </main>

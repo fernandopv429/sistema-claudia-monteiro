@@ -86,6 +86,14 @@ export async function withTenants(mutator) {
   }
 }
 
+// Apaga de vez a linha de dados de um tenant (projetos, responsáveis, etc.)
+// — usado quando o cliente é removido do cadastro, pra não deixar lixo
+// órfão na tabela.
+export async function deleteTenantData(tenantId) {
+  await ensureTable();
+  await pool.query("DELETE FROM app_state WHERE id = $1", [tenantId]);
+}
+
 export async function readTenants() {
   await ensureTable();
   const { rows } = await pool.query("SELECT data FROM app_state WHERE id = $1", [TENANTS_ROW_ID]);
