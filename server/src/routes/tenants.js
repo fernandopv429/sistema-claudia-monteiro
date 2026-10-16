@@ -10,6 +10,19 @@ export const tenantsRouter = Router();
 // chave de um tenant — isso é gerenciamento de clientes, não uso do painel.
 tenantsRouter.use(requireSuperAdmin);
 
+// GET /api/tenants/_debug/evolution — diagnóstico temporário: confirma o que
+// o servidor está realmente enxergando como EVOLUTION_API_URL/KEY, sem
+// expor a chave inteira. Remover depois de resolver o problema de config.
+tenantsRouter.get("/_debug/evolution", (req, res) => {
+  const key = process.env.EVOLUTION_API_KEY || "";
+  res.json({
+    url: process.env.EVOLUTION_API_URL || null,
+    keyConfigured: Boolean(key),
+    keyLength: key.length,
+    keyPreview: key ? `${key.slice(0, 4)}...${key.slice(-4)}` : null,
+  });
+});
+
 tenantsRouter.get("/", async (req, res) => {
   const tenants = await readTenants();
   // não devolve a apiKey na listagem, só quando criado
