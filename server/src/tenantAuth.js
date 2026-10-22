@@ -3,7 +3,7 @@ import { onlyDigits } from "./phone.js";
 
 // Resolve o tenant (e, quando aplicável, QUEM especificamente está pedindo —
 // req.responsible, usado por access.js pra decidir o que essa pessoa pode
-// ver/mexer) de três formas possíveis, nessa ordem:
+// ver/mexer) de quatro formas possíveis, nessa ordem:
 //
 // 1. Painel web, chave da conta inteira: header "X-Tenant-Key" batendo com
 //    tenant.apiKey — acesso total (req.responsible = null).
@@ -12,6 +12,10 @@ import { onlyDigits } from "./phone.js";
 //    — escopo conforme accessKey (master ou só os projetos próprios).
 // 3. Agente do WhatsApp: query/body "phone" — acha, entre TODOS os tenants,
 //    o responsável cadastrado com esse telefone (e o tenant dele junto).
+// 4. Ingestão de notas do Meet (n8n): query/body "email" — acha o tenant
+//    cujo "email" cadastrado bate com o dono/organizador do arquivo no
+//    Google Drive. Não tem responsável associado (não veio de uma pessoa
+//    falando, é um processo automático).
 export async function resolveTenant(req, res, next) {
   try {
     const keyHeader = req.headers["x-tenant-key"];
@@ -54,7 +58,18 @@ export async function resolveTenant(req, res, next) {
       return res.status(403).json({ error: "Telefone não cadastrado em nenhum cliente" });
     }
 
-    return res.status(401).json({ error: "Informe X-Tenant-Key (painel) ou phone (agente)" });
+    const email = (req.query.email || req.body?.email || "").trim().toLowerCase();
+    if (email) {
+      const tenants = await readTenants();
+      const tenant = tenants.find((t) => (t.email || "").toLowerCase() === email);
+      if (!tenant) return res.status(403).json({ error: "E-mail não cadastrado em nenhum cliente" });
+      req.tenantId = tenant.id;
+      req.tenant = tenant;
+      req.responsible = null;
+      return next();
+    }
+
+    return res.status(401).json({ error: "Informe X-Tenant-Key (painel), phone (agente) ou email (notas de reunião)" });
   } catch (err) {
     next(err);
   }

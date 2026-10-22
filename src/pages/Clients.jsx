@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { Building2, Plus, QrCode, Trash2, RefreshCw, KeyRound, Copy, Check } from "lucide-react";
+import { Building2, Plus, QrCode, Trash2, RefreshCw, KeyRound, Copy, Check, Mail } from "lucide-react";
 import {
   listTenants,
   createTenant,
+  updateTenant,
   deleteTenant,
   regenerateTenantKey,
   getTenantQrCode,
@@ -160,6 +161,7 @@ export default function Clients() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
   const [creating, setCreating] = useState(false);
   const [qrTenant, setQrTenant] = useState(null);
   const [freshTenant, setFreshTenant] = useState(null);
@@ -199,14 +201,29 @@ export default function Clients() {
     setCreating(true);
     setError(null);
     try {
-      const tenant = await createTenant({ name: name.trim() });
+      const tenant = await createTenant({ name: name.trim(), email: email.trim() || undefined });
       setName("");
+      setEmail("");
       await refresh();
       setFreshTenant(tenant);
     } catch (err) {
       setError(err.message);
     } finally {
       setCreating(false);
+    }
+  }
+
+  async function handleEditEmail(tenant) {
+    const value = prompt(
+      "E-mail da conta Google desse cliente (usado pelo fluxo de notas do Meet pra identificar de quem é cada gravação):",
+      tenant.email || ""
+    );
+    if (value === null) return;
+    try {
+      await updateTenant(tenant.id, { email: value.trim() });
+      await refresh();
+    } catch (err) {
+      setError(err.message);
     }
   }
 
@@ -248,12 +265,19 @@ export default function Clients() {
         WhatsApp pra comandos e avisos.
       </p>
 
-      <form onSubmit={handleCreate} className="flex items-center gap-2 mb-6">
+      <form onSubmit={handleCreate} className="flex flex-wrap items-center gap-2 mb-1">
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="Nome do cliente"
-          className="flex-1 text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-400"
+          className="flex-1 min-w-[10rem] text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-400"
+        />
+        <input
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="E-mail do Google (opcional)"
+          type="email"
+          className="flex-1 min-w-[14rem] text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-400"
         />
         <button
           type="submit"
@@ -263,6 +287,10 @@ export default function Clients() {
           <Plus size={16} /> {creating ? "Criando..." : "Cadastrar"}
         </button>
       </form>
+      <p className="text-xs text-slate-400 mb-6">
+        O e-mail é o da conta Google que organiza os Meets desse cliente — usado pelo fluxo de notas do Meet pra saber
+        de quem é cada gravação. Pode deixar em branco e preencher depois.
+      </p>
 
       {error && (
         <div className="mb-4 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-sm px-4 py-3">{error}</div>
@@ -303,8 +331,17 @@ export default function Clients() {
             </div>
             <div className="flex-1 min-w-0">
               <div className="text-sm font-medium text-ink-900 truncate">{t.name}</div>
-              <div className="text-xs text-slate-400">instância: {t.evolutionInstance || "—"}</div>
+              <div className="text-xs text-slate-400 truncate">
+                instância: {t.evolutionInstance || "—"} · e-mail: {t.email || "não cadastrado"}
+              </div>
             </div>
+            <button
+              onClick={() => handleEditEmail(t)}
+              title="Cadastrar/editar e-mail do Google (notas de reunião)"
+              className="text-xs font-medium px-2.5 py-1.5 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 flex items-center gap-1"
+            >
+              <Mail size={13} />
+            </button>
             <button
               onClick={() => handleRegenerateKey(t)}
               title="Gerar chave de acesso nova (se o cliente perdeu a dele)"

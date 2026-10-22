@@ -147,6 +147,10 @@ export function createTenant(data) {
   return adminRequest("/tenants", { method: "POST", body: JSON.stringify(data) });
 }
 
+export function updateTenant(id, patch) {
+  return adminRequest(`/tenants/${id}`, { method: "PATCH", body: JSON.stringify(patch) });
+}
+
 export function deleteTenant(id) {
   return adminRequest(`/tenants/${id}`, { method: "DELETE" });
 }

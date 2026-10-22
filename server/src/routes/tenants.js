@@ -16,20 +16,30 @@ tenantsRouter.get("/", async (req, res) => {
   res.json(tenants.map(({ apiKey, ...t }) => t));
 });
 
-// POST /api/tenants { name }
+// POST /api/tenants { name, email? }
 // Cria um cliente novo com uma chave de acesso nova (login no painel, header
 // X-Tenant-Key) e já provisiona pra ele uma instância própria de WhatsApp na
 // Evolution API — é o número que vai mandar lembretes e receber comandos
 // desse cliente, separado do de qualquer outro.
+// "email" (opcional) é o e-mail da conta Google desse cliente — usado pelo
+// fluxo de notas do Meet (n8n) pra saber de qual cliente é cada gravação,
+// comparando com o dono/organizador do arquivo no Drive.
 tenantsRouter.post("/", async (req, res) => {
-  const { name } = req.body || {};
+  const { name, email } = req.body || {};
   if (!name || !name.trim()) return res.status(400).json({ error: "name é obrigatório" });
 
   const apiKey = "tn_" + crypto.randomBytes(24).toString("hex");
   const tenant = await withTenants((registry) => {
     const id = `tenant_${Date.now().toString(36)}_${registry.idCounter}`;
     registry.idCounter += 1;
-    const t = { id, name: name.trim(), apiKey, evolutionInstance: id, createdAt: new Date().toISOString() };
+    const t = {
+      id,
+      name: name.trim(),
+      email: email?.trim() || null,
+      apiKey,
+      evolutionInstance: id,
+      createdAt: new Date().toISOString(),
+    };
     registry.tenants.push(t);
     return t;
   });
@@ -50,6 +60,22 @@ tenantsRouter.post("/", async (req, res) => {
   }
 
   res.status(201).json(tenant);
+});
+
+// PATCH /api/tenants/:id { name?, email? }
+tenantsRouter.patch("/:id", async (req, res) => {
+  const allowed = ["name", "email"];
+  const updated = await withTenants((registry) => {
+    const tenant = registry.tenants.find((t) => t.id === req.params.id);
+    if (!tenant) return null;
+    for (const key of allowed) {
+      if (req.body && key in req.body) tenant[key] = req.body[key]?.trim() || null;
+    }
+    return tenant;
+  });
+  if (!updated) return res.status(404).json({ error: "Tenant não encontrado" });
+  const { apiKey, ...safe } = updated;
+  res.json(safe);
 });
 
 // POST /api/tenants/:id/regenerate-key — se o cliente perder a chave de
