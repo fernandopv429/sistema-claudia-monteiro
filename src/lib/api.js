@@ -45,6 +45,10 @@ export function deleteProject(id) {
   return request(`/projects/${id}`, { method: "DELETE" });
 }
 
+export function sendProjectSummary(id) {
+  return request(`/projects/${id}/send-summary`, { method: "POST" });
+}
+
 export function getMe() {
   return request("/me");
 }

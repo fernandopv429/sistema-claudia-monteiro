@@ -15,6 +15,14 @@ export function addDays(isoDate, days) {
   return toISODate(d);
 }
 
+// "2026-10-24" -> "24/10/2026", pra textos voltados a humano (e-mails,
+// mensagens de WhatsApp) em vez do formato ISO.
+export function formatDatePT(isoDate) {
+  if (!isoDate) return "—";
+  const [year, month, day] = isoDate.split("-");
+  return `${day}/${month}/${year}`;
+}
+
 // Trata o prazo (só data, sem hora) como o fim daquele dia (23:59:59 local),
 // pra dar um instante real pra comparar com "daqui a N horas".
 export function hoursUntilDeadline(deadlineISO, now = new Date()) {

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, CheckCircle2, Circle, Plus, Check, Trash2 } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Circle, Plus, Check, Trash2, Mail } from "lucide-react";
 import ProgressBar from "../components/ProgressBar";
 import { StatusPill, MeetTag, MeetingSourceTag } from "../components/Badges";
 import { computeProgress, currentPhase } from "../lib/store";
@@ -9,6 +9,7 @@ import {
   createTask,
   updateProject as apiUpdateProject,
   deleteProject as apiDeleteProject,
+  sendProjectSummary,
   listResponsibles,
 } from "../lib/api";
 import { formatDatePT, isOverdue, todayISO } from "../lib/dates";
@@ -22,6 +23,8 @@ export default function ProjectDetail({ projects, refresh, me }) {
   const [newTaskDeadline, setNewTaskDeadline] = useState(todayISO());
   const [newTaskResponsibleId, setNewTaskResponsibleId] = useState("");
   const [responsibles, setResponsibles] = useState([]);
+  const [sendingSummary, setSendingSummary] = useState(false);
+  const [summaryFeedback, setSummaryFeedback] = useState(null);
 
   useEffect(() => {
     listResponsibles().then(setResponsibles).catch(() => {});
@@ -77,6 +80,19 @@ export default function ProjectDetail({ projects, refresh, me }) {
     await refresh();
   }
 
+  async function handleSendSummary() {
+    setSendingSummary(true);
+    setSummaryFeedback(null);
+    try {
+      const result = await sendProjectSummary(project.id);
+      setSummaryFeedback({ ok: true, text: `Enviado pra ${result.to}` });
+    } catch (err) {
+      setSummaryFeedback({ ok: false, text: err.message });
+    } finally {
+      setSendingSummary(false);
+    }
+  }
+
   async function handleDeleteProject() {
     if (!confirm(`Apagar o projeto "${project.clientName}"? Isso remove ele e todas as tarefas, sem volta.`)) return;
     await apiDeleteProject(project.id);
@@ -128,6 +144,16 @@ export default function ProjectDetail({ projects, refresh, me }) {
           </select>
           {me?.isAdmin && (
             <button
+              onClick={handleSendSummary}
+              disabled={sendingSummary}
+              title="Enviar resumo de andamento por e-mail"
+              className="w-9 h-9 flex items-center justify-center rounded-lg text-slate-300 hover:text-brand-600 hover:bg-brand-50 disabled:opacity-60"
+            >
+              <Mail size={16} />
+            </button>
+          )}
+          {me?.isAdmin && (
+            <button
               onClick={handleDeleteProject}
               title="Apagar projeto"
               className="w-9 h-9 flex items-center justify-center rounded-lg text-slate-300 hover:text-rose-500 hover:bg-rose-50"
@@ -137,6 +163,17 @@ export default function ProjectDetail({ projects, refresh, me }) {
           )}
         </div>
       </div>
+
+      {summaryFeedback && (
+        <div
+          className={`text-xs rounded-lg px-3 py-2 mb-4 ${
+            summaryFeedback.ok ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"
+          }`}
+        >
+          {summaryFeedback.ok ? "Resumo enviado: " : "Falhou: "}
+          {summaryFeedback.text}
+        </div>
+      )}
 
       {(project.notes || project.meetingLink) && (
         <div className="bg-white rounded-2xl border border-slate-200 p-5 mb-6">

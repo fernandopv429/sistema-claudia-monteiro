@@ -90,6 +90,16 @@ export async function fetchQrCode(instanceName) {
   }
 }
 
+// Manda uma mensagem de texto pelo WhatsApp do tenant — usado pelos
+// lembretes gerados dentro do próprio sistema (ex: reunião marcada no
+// Calendar), sem depender do fluxo de notificação do n8n pra isso.
+export async function sendTextMessage(instanceName, phone, text) {
+  await evoFetch(`/message/sendText/${instanceName}`, {
+    method: "POST",
+    body: JSON.stringify({ number: phone, text }),
+  });
+}
+
 // Se a instância não existe mais, não é erro pra quem só quer ver o status —
 // devolve "not_provisioned" pra UI mostrar "não conectado" e deixar quem
 // pediu o QR code (fetchQrCode) cuidar de recriar.

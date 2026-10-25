@@ -6,7 +6,11 @@
 const CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
 const REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI;
-const SCOPE = "https://www.googleapis.com/auth/drive.readonly";
+const SCOPE = [
+  "https://www.googleapis.com/auth/drive.readonly",
+  "https://www.googleapis.com/auth/calendar.readonly",
+  "https://www.googleapis.com/auth/gmail.send",
+].join(" ");
 
 function assertConfigured() {
   if (!CLIENT_ID || !CLIENT_SECRET || !REDIRECT_URI) {
@@ -83,11 +87,11 @@ async function driveFetch(accessToken, path) {
   return res.json();
 }
 
-// Toda chamada à Drive API passa por aqui — já cuida de renovar o
-// access_token com o refresh_token antes de cada chamada (mais simples que
-// cachear por expiração, e o custo de um refresh a mais é desprezível pra
-// um poller que roda a cada alguns minutos).
-async function withFreshToken(refreshToken, fn) {
+// Toda chamada à Drive/Calendar/Gmail passa por aqui — já cuida de renovar
+// o access_token com o refresh_token antes de cada chamada (mais simples
+// que cachear por expiração, e o custo de um refresh a mais é desprezível
+// pra um poller que roda a cada alguns minutos).
+export async function withFreshToken(refreshToken, fn) {
   const accessToken = await refreshAccessToken(refreshToken);
   return fn(accessToken);
 }

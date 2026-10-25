@@ -5,6 +5,8 @@ import { todayISO } from "../dates.js";
 import { emitEvent } from "../events.js";
 import { PROJECT_STATUSES, normalizeStatus } from "../status.js";
 import { isAdminRequest, canAccessProject, visibleProjects, requireAdmin } from "../access.js";
+import { sendEmail } from "../gmail.js";
+import { buildProjectSummaryEmail } from "../projectSummary.js";
 
 export const projectsRouter = Router();
 
@@ -96,6 +98,30 @@ projectsRouter.patch("/:id", async (req, res) => {
   });
   if (result.error) return res.status(result.code).json({ error: result.error });
   res.json(result.project);
+});
+
+// POST /api/projects/:id/send-summary — manda um resumo de andamento (status,
+// tarefas atrasadas/próximas) pro e-mail de contato do projeto, usando a
+// conta Google conectada pelo cliente (Gmail). Disparo manual — quem decide
+// quando mandar é quem clica, não um robô mandando sem revisão.
+projectsRouter.post("/:id/send-summary", requireAdmin, async (req, res) => {
+  const project = await readOnly(req.tenantId, (db) => db.projects.find((p) => p.id === req.params.id));
+  if (!project) return res.status(404).json({ error: "Projeto não encontrado" });
+  if (!project.contactEmail) {
+    return res.status(400).json({ error: "Esse projeto não tem e-mail de contato cadastrado" });
+  }
+  const refreshToken = req.tenant?.google?.refreshToken;
+  if (!refreshToken) {
+    return res.status(400).json({ error: "Conecte o Google (Notas do Meet) antes de mandar e-mails" });
+  }
+
+  try {
+    const { subject, text } = buildProjectSummaryEmail(project);
+    await sendEmail(refreshToken, { to: project.contactEmail, subject, text });
+    res.json({ sent: true, to: project.contactEmail });
+  } catch (err) {
+    res.status(502).json({ error: err.message });
+  }
 });
 
 projectsRouter.delete("/:id", requireAdmin, async (req, res) => {

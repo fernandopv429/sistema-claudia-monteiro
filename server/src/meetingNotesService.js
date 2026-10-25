@@ -2,28 +2,7 @@ import { withDb, nextId } from "./db.js";
 import { buildTask, flattenTask } from "./taskHelpers.js";
 import { todayISO, addDays } from "./dates.js";
 import { emitEvent } from "./events.js";
-
-function escapeRegExp(s) {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-// Tenta achar, entre os projetos cadastrados, um cujo nome de cliente apareça
-// no título ou no conteúdo da reunião (case-insensitive, respeitando borda de
-// palavra pra "ass" não bater com "assinar" — e ignorando nomes curtos demais
-// pra isso fazer sentido). Sem acerto, null — a reunião fica na caixa de
-// entrada pra alguém vincular manualmente, em vez de arriscar criar tarefa no
-// cliente errado.
-function matchProjectByClientName(projects, title, content) {
-  const haystack = `${title} ${content}`;
-  return (
-    projects.find((p) => {
-      const name = p.clientName?.trim();
-      if (!name || name.length < 4) return false;
-      const re = new RegExp(`\\b${escapeRegExp(name)}\\b`, "i");
-      return re.test(haystack);
-    }) || null
-  );
-}
+import { matchProjectByClientName } from "./projectMatch.js";
 
 // Caixa de entrada de notas de reunião. Compartilhado entre POST
 // /api/meeting-notes (alimentado pelo n8n, ainda ativo) e a importação
