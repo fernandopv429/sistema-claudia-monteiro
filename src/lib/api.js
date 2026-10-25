@@ -57,6 +57,24 @@ export function getWhatsappQrCode() {
   return request("/whatsapp/qrcode");
 }
 
+export function getGoogleStatus() {
+  return request("/google/status");
+}
+
+export function setGoogleFolder(rootFolderId) {
+  return request("/google/folder", { method: "POST", body: JSON.stringify({ rootFolderId }) });
+}
+
+export function disconnectGoogle() {
+  return request("/google", { method: "DELETE" });
+}
+
+// Monta a URL de início do OAuth — é navegação de página (não fetch), por
+// isso a chave vai na query em vez de um header (ver routes/google.js).
+export function googleConnectUrl() {
+  return `${BASE}/google/connect?key=${encodeURIComponent(getTenantKey())}`;
+}
+
 export function createTask(data) {
   return request("/tasks", { method: "POST", body: JSON.stringify(data) });
 }

@@ -8,6 +8,7 @@ import Today from "./pages/Today";
 import ProjectDetail from "./pages/ProjectDetail";
 import Responsibles from "./pages/Responsibles";
 import WhatsAppPage from "./pages/WhatsApp";
+import GoogleMeetPage from "./pages/GoogleMeet";
 import Clients from "./pages/Clients";
 import { listProjects, getMe } from "./lib/api";
 import { getTenantKey, clearTenantKey } from "./lib/tenant";
@@ -85,6 +86,7 @@ function MainPanel() {
               />
               <Route path="/responsaveis" element={<Responsibles me={me} />} />
               <Route path="/whatsapp" element={<WhatsAppPage />} />
+              <Route path="/notas-meet" element={<GoogleMeetPage />} />
             </Routes>
           )}
         </main>

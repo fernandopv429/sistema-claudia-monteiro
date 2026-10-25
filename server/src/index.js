@@ -11,8 +11,10 @@ import { responsiblesRouter, checkRegisteredPhone } from "./routes/responsibles.
 import { tenantsRouter } from "./routes/tenants.js";
 import { meRouter } from "./routes/me.js";
 import { whatsappRouter } from "./routes/whatsapp.js";
+import { googleRouter, googleOAuthRouter } from "./routes/google.js";
 import { resolveTenant } from "./tenantAuth.js";
 import { startScheduler } from "./scheduler.js";
+import { startGoogleMeetPoller } from "./googlePoller.js";
 import { readTenants } from "./db.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -35,6 +37,12 @@ app.use("/api/tenants", tenantsRouter);
 // cadastrado em algum cliente, antes de mais nada.
 app.get("/api/responsibles/check", checkRegisteredPhone);
 
+// Início/fim do fluxo OAuth do Google: o navegador é redirecionado direto
+// pra cá, então não manda X-Tenant-Key no header — essas rotas resolvem a
+// identidade por conta própria (ver routes/google.js), por isso ficam
+// antes do resolveTenant.
+app.use("/api/google", googleOAuthRouter);
+
 // Daqui pra baixo, toda rota exige um tenant resolvido: painel web manda
 // "X-Tenant-Key" (a chave de acesso daquele cliente); o agente do WhatsApp
 // manda "phone", que é cruzado com os responsáveis cadastrados de cada
@@ -43,6 +51,7 @@ app.use("/api", resolveTenant);
 
 app.use("/api/me", meRouter);
 app.use("/api/whatsapp", whatsappRouter);
+app.use("/api/google", googleRouter);
 app.use("/api/projects", projectsRouter);
 app.use("/api/tasks", tasksRouter);
 app.use("/api/webhooks", webhooksRouter);
@@ -84,6 +93,7 @@ async function bootstrap() {
   });
 
   startScheduler();
+  startGoogleMeetPoller();
 }
 
 bootstrap();

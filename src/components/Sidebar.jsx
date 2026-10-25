@@ -1,5 +1,5 @@
 import { NavLink } from "react-router-dom";
-import { LayoutGrid, CalendarCheck, Users, Database, LogOut, MessageCircle } from "lucide-react";
+import { LayoutGrid, CalendarCheck, Users, Database, LogOut, MessageCircle, Video } from "lucide-react";
 
 const linkBase =
   "flex items-center justify-center w-11 h-11 rounded-xl transition-colors";
@@ -66,6 +66,18 @@ export default function Sidebar({ open, onNavigate, onLogout, me }) {
               }
             >
               <MessageCircle size={20} />
+            </NavLink>
+          )}
+          {me?.isAdmin && (
+            <NavLink
+              to="/notas-meet"
+              title="Notas do Meet"
+              onClick={onNavigate}
+              className={({ isActive }) =>
+                `${linkBase} ${isActive ? "bg-white/10 text-white" : "text-white/60 hover:bg-white/5 hover:text-white"}`
+              }
+            >
+              <Video size={20} />
             </NavLink>
           )}
         </nav>
